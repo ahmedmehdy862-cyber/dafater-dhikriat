@@ -62,8 +62,12 @@ export default function Home() {
 
         {/* Title */}
         <h1 className="text-4xl md:text-5xl font-bold text-[var(--blue-dark)] mb-4 leading-tight">
-          دفتر ذكريات
+          دفتر ذكريات أحمد مهدي
         </h1>
+
+        <p className="text-base text-[var(--gray-500)] mb-4">
+          مسؤول الميديا — أسر صناع الحياة بالجامعات المصرية
+        </p>
 
         {/* Subtitle */}
         <p className="text-lg md:text-xl text-[var(--gray-600)] mb-2 leading-relaxed">

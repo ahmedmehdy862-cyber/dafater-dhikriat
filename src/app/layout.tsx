@@ -9,8 +9,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "دفتر ذكريات",
-  description: "دفتر ذكريات — اكتبلي كلمتين تحب أفتكرهم منك",
+  title: "دفتر ذكريات أحمد مهدي — مسؤول الميديا",
+  description: "دفتر ذكريات أحمد مهدي مسؤول الميديا — اكتبلي كلمتين تحب أفتكرهم منك",
   icons: { icon: "/favicon.ico" },
 };
 
