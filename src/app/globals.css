@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+:root {
+  --blue-dark: #123B5D;
+  --orange-warm: #E9A23B;
+  --cream: #FFF8ED;
+  --text-dark: #263238;
+  --white: #FFFFFF;
+  --blue-light: #1a4f7a;
+  --orange-light: #f0b85a;
+  --cream-dark: #f5edd8;
+  --gray-100: #f5f5f5;
+  --gray-200: #e5e5e5;
+  --gray-300: #d4d4d4;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+@theme inline {
+  --color-blue-dark: var(--blue-dark);
+  --color-orange-warm: var(--orange-warm);
+  --color-cream: var(--cream);
+  --color-text-dark: var(--text-dark);
+  --color-cream-dark: var(--cream-dark);
+  --font-sans: "Cairo", "Tajawal", "IBM Plex Sans Arabic", Arial, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: "Cairo", "Tajawal", "IBM Plex Sans Arabic", Arial, sans-serif;
+  direction: rtl;
+  min-height: 100vh;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--orange-warm);
+  color: var(--white);
+}
+
+/* Paper texture background */
+.paper-bg {
+  background-color: var(--cream);
+  background-image:
+    radial-gradient(circle at 25px 25px, rgba(18, 59, 93, 0.02) 2%, transparent 0%),
+    radial-gradient(circle at 75px 75px, rgba(18, 59, 93, 0.02) 2%, transparent 0%);
+  background-size: 100px 100px;
+}
+
+/* Notebook lines */
+.notebook-lines {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    rgba(18, 59, 93, 0.06) 31px,
+    rgba(18, 59, 93, 0.06) 32px
+  );
+  background-position: 0 8px;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease forwards;
+}
+
+/* Page flip effect */
+@keyframes pageFlip {
+  0% { transform: perspective(1200px) rotateY(-10deg); opacity: 0; }
+  100% { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
+}
+
+.animate-page-flip {
+  animation: pageFlip 0.8s ease forwards;
+}
+
+/* Typing effect */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink::after {
+  content: '|';
+  animation: blink 1s infinite;
+  color: var(--orange-warm);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cream);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 59, 93, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 59, 93, 0.4);
+}
+
+/* Focus visible */
+*:focus-visible {
+  outline: 2px solid var(--orange-warm);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(18, 59, 93, 0.1);
+  border-top-color: var(--blue-dark);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Mobile safe area */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
