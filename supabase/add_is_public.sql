@@ -1,5 +1,13 @@
--- Add is_public column to memories table
-ALTER TABLE memories ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
+-- Add is_public column to memories table (skip if already exists)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'memories' AND column_name = 'is_public'
+  ) THEN
+    ALTER TABLE memories ADD COLUMN is_public BOOLEAN DEFAULT true;
+  END IF;
+END $$;
 
--- Update existing approved memories to be public
+-- Set existing memories to public
 UPDATE memories SET is_public = true WHERE is_public IS NULL;
