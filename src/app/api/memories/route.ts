@@ -94,13 +94,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!consent_to_publish) {
-      return NextResponse.json(
-        { error: "لازم توافق على عرض الرسالة" },
-        { status: 400 }
-      );
-    }
-
     // Sanitize input
     const dangerousPattern = /<[^>]*>|javascript:|on\w+\s*=/i;
     if (dangerousPattern.test(message) || dangerousPattern.test(name)) {
