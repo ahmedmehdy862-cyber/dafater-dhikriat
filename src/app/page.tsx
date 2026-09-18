@@ -106,7 +106,7 @@ export default function HomePage() {
             show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           }`}
         >
-          <a href="/add" className="btn btn-primary text-lg px-8 py-4 shadow-lg shadow-[var(--blue-dark)]/20">
+          <a href="/write" className="btn btn-primary text-lg px-8 py-4 shadow-lg shadow-[var(--blue-dark)]/20">
             اكتب ذكريتك
           </a>
           <a href="/memories" className="btn btn-outline text-lg px-8 py-4">

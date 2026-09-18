@@ -65,6 +65,7 @@ export default function MemoriesPage() {
   const [search, setSearch] = useState("");
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [visibleCards, setVisibleCards] = useState<boolean[]>([]);
+  const [showRandomModal, setShowRandomModal] = useState(false);
 
   useEffect(() => {
     fetchMemories();
@@ -83,6 +84,12 @@ export default function MemoriesPage() {
       });
     }
   }, [loading, memories]);
+
+  function pickRandom() {
+    if (memories.length === 0) return;
+    const idx = Math.floor(Math.random() * memories.length);
+    setSelectedMemory(memories[idx]);
+  }
 
   async function fetchMemories() {
     setLoading(true);
@@ -170,7 +177,7 @@ export default function MemoriesPage() {
           </Link>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => router.push("/random")}
+              onClick={pickRandom}
               className="btn btn-accent text-sm"
             >
               فاجئني
