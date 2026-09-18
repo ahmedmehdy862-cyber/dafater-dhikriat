@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS memories (
   image_url TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'hidden')),
   consent_to_publish BOOLEAN DEFAULT false,
+  is_public BOOLEAN DEFAULT true,
   is_favorite BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
