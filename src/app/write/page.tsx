@@ -23,6 +23,7 @@ export default function WritePage() {
   const msgValid = message.trim().length >= 10 && message.length <= MAX_MESSAGE;
   const step1Done = nameValid;
   const step2Done = msgValid;
+  const step3Done = step1Done && step2Done;
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -107,7 +108,7 @@ export default function WritePage() {
   const steps = [
     { n: 1, label: "الاسم", done: step1Done },
     { n: 2, label: "رسالتك", done: step2Done },
-    { n: 3, label: "اختيارات", done: false },
+    { n: 3, label: "اختيارات", done: step3Done },
   ];
 
   return (
@@ -115,22 +116,24 @@ export default function WritePage() {
       className="min-h-screen relative overflow-hidden"
       style={{ background: "var(--cream)" }}
     >
-      <div className="pattern-dots absolute inset-0 pointer-events-none" />
+      <div className="pattern-dots absolute inset-0 pointer-events-none opacity-40" />
       <div
-        className="blob-blue absolute -top-32 -right-32 w-80 h-80 rounded-full opacity-40"
+        className="blob-blue absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-30 blur-sm pointer-events-none"
+        aria-hidden="true"
       />
       <div
-        className="blob-blue absolute bottom-10 -left-20 w-60 h-60 rounded-full opacity-20"
+        className="blob-blue absolute bottom-20 -left-16 w-56 h-56 rounded-full opacity-20 blur-sm pointer-events-none"
+        aria-hidden="true"
       />
 
       <header
         className="sticky top-0 z-30 glass border-b"
-        style={{ borderColor: "var(--border-light)" }}
+        style={{ borderColor: "rgba(15,43,70,0.08)" }}
       >
-        <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-medium transition-colors hover:opacity-70"
+            className="flex items-center gap-2 text-sm font-medium transition-all hover:opacity-70 active:scale-95"
             style={{ color: "var(--blue-dark)" }}
           >
             <svg
@@ -157,20 +160,20 @@ export default function WritePage() {
         </div>
       </header>
 
-      <div className="relative z-10 max-w-xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-8">
+      <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <nav className="flex items-center gap-1 sm:gap-3 mb-8 sm:mb-10" aria-label="خطوات الإدخال">
           {steps.map((s, i) => (
             <div key={s.n} className="flex-1 flex flex-col items-center">
               <div className="flex items-center w-full">
                 <div className="w-full flex items-center gap-2">
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all duration-300"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all duration-300"
                     style={{
                       background: s.done ? "var(--success)" : "var(--blue-dark)",
                       color: "white",
                       boxShadow: s.done
-                        ? "0 2px 8px rgba(5,150,105,0.35)"
-                        : "none",
+                        ? "0 2px 12px rgba(5,150,105,0.4)"
+                        : "0 1px 4px rgba(15,43,70,0.15)",
                     }}
                   >
                     {s.done ? (
@@ -192,11 +195,9 @@ export default function WritePage() {
                     )}
                   </div>
                   <span
-                    className="text-xs font-semibold hidden sm:inline"
+                    className="text-xs font-semibold hidden sm:inline whitespace-nowrap"
                     style={{
-                      color: s.done
-                        ? "var(--success)"
-                        : "var(--text-muted)",
+                      color: s.done ? "var(--success)" : "var(--text-muted, #6b7280)",
                     }}
                   >
                     {s.label}
@@ -206,22 +207,22 @@ export default function WritePage() {
               <div
                 className="h-1 w-full rounded-full mt-2 transition-all duration-500"
                 style={{
-                  background: s.done ? "var(--success)" : "var(--border)",
+                  background: s.done ? "var(--success)" : "rgba(15,43,70,0.1)",
                 }}
               />
             </div>
           ))}
-        </div>
+        </nav>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div
-            className="card p-5 anim-fade-up"
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          <section
+            className="card p-4 sm:p-6 anim-fade-up"
             style={{ animationDelay: "0.05s", animationFillMode: "backwards" }}
           >
             <label htmlFor="name" className="flex items-center gap-2 mb-3">
               <span
                 className="text-base font-bold"
-                style={{ color: "var(--text-dark)" }}
+                style={{ color: "var(--blue-dark)" }}
               >
                 اسمك
               </span>
@@ -243,25 +244,29 @@ export default function WritePage() {
               placeholder="اكتب اسمك..."
               className="input"
               autoFocus
+              autoComplete="name"
             />
             {errors.name && (
               <p
                 className="mt-2 text-sm font-medium flex items-center gap-1"
                 style={{ color: "var(--danger)" }}
               >
+                <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                </svg>
                 {errors.name}
               </p>
             )}
-          </div>
+          </section>
 
-          <div
-            className="card p-5 anim-fade-up"
+          <section
+            className="card p-4 sm:p-6 anim-fade-up"
             style={{ animationDelay: "0.1s", animationFillMode: "backwards" }}
           >
             <label htmlFor="message" className="flex items-center gap-2 mb-3">
               <span
                 className="text-base font-bold"
-                style={{ color: "var(--text-dark)" }}
+                style={{ color: "var(--blue-dark)" }}
               >
                 رسالتك ليا
               </span>
@@ -289,32 +294,35 @@ export default function WritePage() {
                   className="text-sm font-medium flex items-center gap-1"
                   style={{ color: "var(--danger)" }}
                 >
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                  </svg>
                   {errors.message}
                 </p>
               ) : (
                 <span />
               )}
               <span
-                className="text-xs font-medium"
+                className="text-xs font-medium tabular-nums"
                 style={{
                   color:
                     message.length > MAX_MESSAGE
                       ? "var(--danger)"
-                      : "var(--text-light)",
+                      : "var(--text-light, #9ca3af)",
                 }}
               >
                 {message.length}/{MAX_MESSAGE}
               </span>
             </div>
-          </div>
+          </section>
 
-          <div
-            className="card p-5 anim-fade-up"
+          <section
+            className="card p-4 sm:p-6 anim-fade-up"
             style={{ animationDelay: "0.15s", animationFillMode: "backwards" }}
           >
             <p
               className="text-base font-bold mb-5"
-              style={{ color: "var(--text-dark)" }}
+              style={{ color: "var(--blue-dark)" }}
             >
               اختيارات إضافية
             </p>
@@ -323,7 +331,7 @@ export default function WritePage() {
               <label
                 htmlFor="university"
                 className="block text-sm font-medium mb-2"
-                style={{ color: "var(--text-dark)" }}
+                style={{ color: "var(--blue-dark)" }}
               >
                 جامعتك أو كيانك
               </label>
@@ -334,13 +342,14 @@ export default function WritePage() {
                 onChange={(e) => setUniversity(e.target.value)}
                 placeholder="مثلاً: جامعة القاهرة"
                 className="input"
+                autoComplete="organization"
               />
             </div>
 
             <div className="mb-5">
               <label
                 className="block text-sm font-medium mb-2"
-                style={{ color: "var(--text-dark)" }}
+                style={{ color: "var(--blue-dark)" }}
               >
                 صورة تجمعنا
               </label>
@@ -348,14 +357,16 @@ export default function WritePage() {
                 <div className="relative inline-block">
                   <img
                     src={imagePreview}
-                    alt="معاينة"
-                    className="w-28 h-28 object-cover rounded-xl"
-                    style={{ border: "2px solid var(--border)" }}
+                    alt="معاينة الصورة"
+                    className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-xl"
+                    style={{
+                      border: "2px solid var(--border, #e5e7eb)",
+                    }}
                   />
                   <button
                     type="button"
                     onClick={removeImage}
-                    className="absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                    className="absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-bold transition-transform hover:scale-110 active:scale-95"
                     style={{ background: "var(--danger)" }}
                     aria-label="حذف الصورة"
                   >
@@ -365,14 +376,22 @@ export default function WritePage() {
               ) : (
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all hover:border-[var(--blue-medium)]"
-                  style={{ borderColor: "var(--border)" }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all hover:border-[var(--blue-medium,#1a5276)] hover:bg-[var(--orange-light,#fdf2dc)]/50 active:scale-[0.98]"
+                  style={{ borderColor: "var(--border, #d1d5db)" }}
                 >
                   <svg
                     className="w-10 h-10 mx-auto mb-2"
                     fill="none"
                     viewBox="0 0 24 24"
-                    stroke="var(--text-light)"
+                    stroke="var(--text-light, #9ca3af)"
                     strokeWidth={1.5}
                   >
                     <path
@@ -383,13 +402,13 @@ export default function WritePage() {
                   </svg>
                   <p
                     className="text-sm font-medium"
-                    style={{ color: "var(--text-muted)" }}
+                    style={{ color: "var(--text-muted, #6b7280)" }}
                   >
                     اضغط لاختيار صورة
                   </p>
                   <p
                     className="text-xs mt-1"
-                    style={{ color: "var(--text-light)" }}
+                    style={{ color: "var(--text-light, #9ca3af)" }}
                   >
                     JPG، PNG، WebP — حد أقصى 5 ميجا
                   </p>
@@ -404,50 +423,47 @@ export default function WritePage() {
               />
               {errors.image && (
                 <p
-                  className="mt-1 text-sm"
+                  className="mt-2 text-sm font-medium flex items-center gap-1"
                   style={{ color: "var(--danger)" }}
                 >
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                  </svg>
                   {errors.image}
                 </p>
               )}
             </div>
 
             <div
-              className="flex items-center justify-between p-4 rounded-xl"
+              className="flex items-center justify-between p-3 sm:p-4 rounded-xl"
               style={{ background: "var(--cream)" }}
             >
-              <div>
+              <div className="min-w-0">
                 <p
                   className="text-sm font-bold"
-                  style={{ color: "var(--text-dark)" }}
+                  style={{ color: "var(--blue-dark)" }}
                 >
                   رسالتي للجمهور
                 </p>
                 <p
                   className="text-xs mt-0.5"
-                  style={{ color: "var(--text-muted)" }}
+                  style={{ color: "var(--text-muted, #6b7280)" }}
                 >
                   {isPublic
                     ? "رسالتك هتظهر للجميع"
                     : "رسالتك هتفضل خاصة بالمسؤول"}
                 </p>
               </div>
-              <div
+              <button
+                type="button"
                 className={`toggle-wrap ${isPublic ? "on" : ""}`}
                 onClick={() => setIsPublic(!isPublic)}
                 role="switch"
                 aria-checked={isPublic}
                 aria-label="إظهار الرسالة للجمهور"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") {
-                    e.preventDefault();
-                    setIsPublic(!isPublic);
-                  }
-                }}
               />
             </div>
-          </div>
+          </section>
 
           {submitError && (
             <div
@@ -457,7 +473,11 @@ export default function WritePage() {
                 border: "1px solid #fecaca",
                 color: "var(--danger)",
               }}
+              role="alert"
             >
+              <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+              </svg>
               {submitError}
             </div>
           )}
@@ -465,7 +485,7 @@ export default function WritePage() {
           <button
             type="submit"
             disabled={isSubmitting || !nameValid || !msgValid}
-            className="btn btn-primary btn-lg w-full disabled:opacity-40 disabled:cursor-not-allowed anim-fade-up"
+            className="btn btn-primary btn-lg w-full disabled:opacity-40 disabled:cursor-not-allowed anim-fade-up flex items-center justify-center gap-2"
             style={{ animationDelay: "0.2s", animationFillMode: "backwards" }}
           >
             {isSubmitting ? (
@@ -479,8 +499,8 @@ export default function WritePage() {
           </button>
 
           <p
-            className="text-center text-xs"
-            style={{ color: "var(--text-light)" }}
+            className="text-center text-xs pb-4"
+            style={{ color: "var(--text-light, #9ca3af)" }}
           >
             رسالتك هتظهر بعد مراجعتها من المسؤول
           </p>

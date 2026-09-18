@@ -54,29 +54,13 @@ body {
   background-size: 24px 24px;
 }
 
-.pattern-lines {
-  background-image: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 10px,
-    rgba(232,155,45,0.03) 10px,
-    rgba(232,155,45,0.03) 11px
-  );
-}
-
 /* ===== GLASS ===== */
 .glass {
-  background: rgba(255,255,255,0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.4);
-}
-
-.glass-dark {
-  background: rgba(15,43,70,0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.3);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
 }
 
 /* ===== BUTTONS ===== */
@@ -90,7 +74,7 @@ body {
   font-weight: 700;
   font-size: 15px;
   font-family: inherit;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   cursor: pointer;
   border: none;
   outline: none;
@@ -98,25 +82,34 @@ body {
   position: relative;
   overflow: hidden;
 }
-.btn:active { transform: scale(0.97); }
+.btn:active { transform: scale(0.97) !important; }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-medium) 100%);
+  background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-medium) 50%, var(--blue-light) 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(15,43,70,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+  box-shadow: 0 4px 15px rgba(15,43,70,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
 }
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.btn-primary:hover::before { opacity: 1; }
 .btn-primary:hover {
-  box-shadow: 0 8px 25px rgba(15,43,70,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 8px 30px rgba(15,43,70,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
   transform: translateY(-2px);
 }
 
 .btn-accent {
   background: linear-gradient(135deg, var(--orange-warm) 0%, var(--orange-deep) 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(232,155,45,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 4px 15px rgba(232,155,45,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 .btn-accent:hover {
-  box-shadow: 0 8px 25px rgba(232,155,45,0.45), inset 0 1px 0 rgba(255,255,255,0.2);
+  box-shadow: 0 8px 25px rgba(232,155,45,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
   transform: translateY(-2px);
 }
 
@@ -127,9 +120,10 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .btn-outline:hover {
-  border-color: var(--blue-dark);
+  border-color: var(--blue-medium);
   background: var(--blue-pale);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(15,43,70,0.1);
+  transform: translateY(-2px);
 }
 
 .btn-ghost {
@@ -141,8 +135,19 @@ body {
   color: var(--text-dark);
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, var(--danger), #b91c1c);
+  color: white;
+  box-shadow: 0 4px 15px rgba(220,38,38,0.3);
+}
+.btn-danger:hover {
+  box-shadow: 0 8px 25px rgba(220,38,38,0.4);
+  transform: translateY(-2px);
+}
+
 .btn-sm { padding: 10px 20px; font-size: 13px; border-radius: 10px; }
 .btn-lg { padding: 18px 36px; font-size: 17px; border-radius: 16px; }
+.btn-xl { padding: 20px 44px; font-size: 18px; border-radius: 18px; }
 
 /* ===== CARDS ===== */
 .card {
@@ -162,13 +167,13 @@ body {
 .input {
   width: 100%;
   padding: 14px 18px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 2px solid var(--border);
   background: white;
   color: var(--text-dark);
   font-size: 15px;
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   outline: none;
 }
 .input:focus {
@@ -185,7 +190,7 @@ body {
   background: var(--border);
   border-radius: 14px;
   cursor: pointer;
-  transition: background 0.3s;
+  transition: all 0.3s;
   flex-shrink: 0;
 }
 .toggle-wrap.on { background: var(--blue-dark); }
@@ -207,13 +212,9 @@ body {
 @keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 @keyframes scaleIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
-@keyframes slideDown { from { opacity:0; max-height:0; } to { opacity:1; max-height:800px; } }
-@keyframes float { 0%,100% { transform:translateY(0) rotate(0deg); } 50% { transform:translateY(-15px) rotate(2deg); } }
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+@keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-12px); } }
 @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
-@keyframes bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
 @keyframes wiggle { 0%,100% { transform:rotate(0deg); } 25% { transform:rotate(-3deg); } 75% { transform:rotate(3deg); } }
-@keyframes ripple { 0% { transform:scale(0); opacity:0.5; } 100% { transform:scale(4); opacity:0; } }
 
 .anim-fade-up { animation: fadeUp 0.6s ease forwards; }
 .anim-fade-in { animation: fadeIn 0.4s ease forwards; }
@@ -258,6 +259,15 @@ body {
 /* ===== SPINNER ===== */
 .spinner { width:22px; height:22px; border:3px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* ===== RESPONSIVE UTILITIES ===== */
+@media (max-width: 640px) {
+  .btn { padding: 12px 20px; font-size: 14px; border-radius: 12px; }
+  .btn-lg { padding: 14px 28px; font-size: 16px; border-radius: 14px; }
+  .btn-xl { padding: 16px 32px; font-size: 16px; border-radius: 14px; }
+  .card { border-radius: 16px; }
+  .input { padding: 12px 16px; font-size: 16px; border-radius: 12px; }
+}
 
 /* ===== SAFE AREA ===== */
 @supports (padding: env(safe-area-inset-bottom)) { body { padding-bottom: env(safe-area-inset-bottom); } }

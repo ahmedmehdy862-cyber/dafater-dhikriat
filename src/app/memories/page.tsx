@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -64,34 +64,9 @@ export default function MemoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [visibleCards, setVisibleCards] = useState<boolean[]>([]);
-  const [showRandomModal, setShowRandomModal] = useState(false);
+  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    fetchMemories();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && memories.length > 0) {
-      memories.forEach((_, i) => {
-        setTimeout(() => {
-          setVisibleCards((prev) => {
-            const next = [...prev];
-            next[i] = true;
-            return next;
-          });
-        }, i * 80);
-      });
-    }
-  }, [loading, memories]);
-
-  function pickRandom() {
-    if (memories.length === 0) return;
-    const idx = Math.floor(Math.random() * memories.length);
-    setSelectedMemory(memories[idx]);
-  }
-
-  async function fetchMemories() {
+  const fetchMemories = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -104,7 +79,30 @@ export default function MemoriesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
+
+  useEffect(() => {
+    if (!loading && memories.length > 0) {
+      const timers: NodeJS.Timeout[] = [];
+      memories.forEach((_, i) => {
+        const t = setTimeout(() => {
+          setVisibleCards((prev) => new Set(prev).add(i));
+        }, i * 80);
+        timers.push(t);
+      });
+      return () => timers.forEach(clearTimeout);
+    }
+  }, [loading, memories]);
+
+  const pickRandom = useCallback(() => {
+    if (memories.length === 0) return;
+    const idx = Math.floor(Math.random() * memories.length);
+    setSelectedMemory(memories[idx]);
+  }, [memories]);
 
   const filteredMemories = useMemo(() => {
     if (!search.trim()) return memories;
@@ -120,12 +118,26 @@ export default function MemoriesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--cream)" }}>
-        <div className="blob-blue blob-orange" />
+      <div
+        className="min-h-screen flex items-center justify-center relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
+        }}
+      >
+        <div className="blob-blue" />
+        <div className="blob-orange" />
         <div className="pattern-dots" />
         <div className="text-center z-10 relative">
-          <div className="spinner mx-auto mb-4" style={{ width: 48, height: 48 }} />
-          <p style={{ color: "var(--blue-dark)", fontFamily: "var(--font-body)" }}>
+          <div
+            className="spinner mx-auto mb-4"
+            style={{ width: 48, height: 48 }}
+          />
+          <p
+            style={{
+              color: "var(--blue-dark)",
+              fontFamily: "var(--font-body)",
+            }}
+          >
             جاري تحميل الذكريات...
           </p>
         </div>
@@ -135,12 +147,24 @@ export default function MemoriesPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--cream)" }}>
-        <div className="blob-blue blob-orange" />
+      <div
+        className="min-h-screen flex items-center justify-center relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
+        }}
+      >
+        <div className="blob-blue" />
+        <div className="blob-orange" />
         <div className="pattern-dots" />
         <div className="text-center z-10 relative">
           <div className="text-6xl mb-4">😵</div>
-          <p style={{ color: "var(--blue-dark)", fontFamily: "var(--font-body)" }} className="text-lg mb-4">
+          <p
+            style={{
+              color: "var(--blue-dark)",
+              fontFamily: "var(--font-body)",
+            }}
+            className="text-lg mb-4"
+          >
             {error}
           </p>
           <button onClick={fetchMemories} className="btn btn-primary">
@@ -152,7 +176,12 @@ export default function MemoriesPage() {
   }
 
   return (
-    <div className="min-h-screen relative" style={{ backgroundColor: "var(--cream)" }}>
+    <div
+      className="min-h-screen relative overflow-hidden"
+      style={{
+        background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
+      }}
+    >
       <div className="blob-blue" />
       <div className="blob-orange" />
       <div className="pattern-dots" />
@@ -164,22 +193,29 @@ export default function MemoriesPage() {
           backdropFilter: "blur(16px)",
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <Link
             href="/"
             className="btn btn-ghost text-sm"
             style={{ color: "var(--blue-dark)" }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ marginLeft: 6 }}
+            >
               <path d="M15 18l-6-6 6-6" />
             </svg>
             الرئيسية
           </Link>
           <div className="flex items-center gap-2">
-            <button
-              onClick={pickRandom}
-              className="btn btn-accent text-sm"
-            >
+            <button onClick={pickRandom} className="btn btn-accent text-sm">
               فاجئني
             </button>
             <button
@@ -192,15 +228,21 @@ export default function MemoriesPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 relative z-10">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10">
         <div className="text-center mb-8">
           <h1
             className="text-3xl md:text-4xl font-bold mb-2"
-            style={{ color: "var(--blue-dark)", fontFamily: "var(--font-heading)" }}
+            style={{
+              color: "var(--blue-dark)",
+              fontFamily: "var(--font-heading)",
+            }}
           >
             كل الذكريات
           </h1>
-          <p style={{ color: "var(--orange-warm)" }} className="text-lg">
+          <p
+            style={{ color: "var(--orange-warm)" }}
+            className="text-lg"
+          >
             {memories.length} ذكرى محفوظة
           </p>
         </div>
@@ -216,7 +258,13 @@ export default function MemoriesPage() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", opacity: 0.4 }}
+              style={{
+                position: "absolute",
+                right: 14,
+                top: "50%",
+                transform: "translateY(-50%)",
+                opacity: 0.4,
+              }}
             >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -237,11 +285,17 @@ export default function MemoriesPage() {
             <div className="text-6xl mb-6">📖</div>
             <h2
               className="text-2xl font-bold mb-3"
-              style={{ color: "var(--blue-dark)", fontFamily: "var(--font-heading)" }}
+              style={{
+                color: "var(--blue-dark)",
+                fontFamily: "var(--font-heading)",
+              }}
             >
               لسه أول صفحة
             </h2>
-            <p style={{ color: "var(--blue-dark)", opacity: 0.6 }} className="mb-6">
+            <p
+              style={{ color: "var(--blue-dark)", opacity: 0.6 }}
+              className="mb-6"
+            >
               كن أول من يكتب ذكرى في هذا الكتاب
             </p>
             <Link href="/write" className="btn btn-primary">
@@ -253,7 +307,10 @@ export default function MemoriesPage() {
             <div className="text-6xl mb-6">🔍</div>
             <h2
               className="text-2xl font-bold mb-3"
-              style={{ color: "var(--blue-dark)", fontFamily: "var(--font-heading)" }}
+              style={{
+                color: "var(--blue-dark)",
+                fontFamily: "var(--font-heading)",
+              }}
             >
               لا توجد نتائج
             </h2>
@@ -268,8 +325,10 @@ export default function MemoriesPage() {
                 key={memory.id}
                 className="card card-hover cursor-pointer"
                 style={{
-                  opacity: visibleCards[i] ? 1 : 0,
-                  transform: visibleCards[i] ? "translateY(0)" : "translateY(24px)",
+                  opacity: visibleCards.has(i) ? 1 : 0,
+                  transform: visibleCards.has(i)
+                    ? "translateY(0)"
+                    : "translateY(24px)",
                   transition: "opacity 0.5s ease, transform 0.5s ease",
                 }}
                 onClick={() => setSelectedMemory(memory)}
@@ -277,13 +336,20 @@ export default function MemoriesPage() {
                 <div className="relative p-6">
                   <div
                     className="absolute top-3 left-4 text-7xl font-bold leading-none select-none pointer-events-none"
-                    style={{ color: "var(--orange-warm)", opacity: 0.15, fontFamily: "Georgia, serif" }}
+                    style={{
+                      color: "var(--orange-warm)",
+                      opacity: 0.15,
+                      fontFamily: "Georgia, serif",
+                    }}
                   >
                     "
                   </div>
                   <p
                     className="text-lg leading-relaxed mb-4 relative z-10"
-                    style={{ color: "var(--blue-dark)", fontFamily: "var(--font-body)" }}
+                    style={{
+                      color: "var(--blue-dark)",
+                      fontFamily: "var(--font-body)",
+                    }}
                   >
                     {memory.message}
                   </p>
@@ -300,11 +366,15 @@ export default function MemoriesPage() {
                   )}
                   <div
                     className="flex items-center gap-3 pt-3"
-                    style={{ borderTop: "1px solid rgba(15,43,70,0.08)" }}
+                    style={{
+                      borderTop: "1px solid rgba(15,43,70,0.08)",
+                    }}
                   >
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                      style={{ backgroundColor: getColorByName(memory.name) }}
+                      style={{
+                        backgroundColor: getColorByName(memory.name),
+                      }}
                     >
                       {getInitials(memory.name)}
                     </div>
@@ -316,12 +386,24 @@ export default function MemoriesPage() {
                         {memory.name}
                       </p>
                       {memory.university && (
-                        <p className="text-xs truncate" style={{ color: "var(--blue-dark)", opacity: 0.5 }}>
+                        <p
+                          className="text-xs truncate"
+                          style={{
+                            color: "var(--blue-dark)",
+                            opacity: 0.5,
+                          }}
+                        >
                           {memory.university}
                         </p>
                       )}
                     </div>
-                    <span className="text-xs shrink-0" style={{ color: "var(--blue-dark)", opacity: 0.4 }}>
+                    <span
+                      className="text-xs shrink-0"
+                      style={{
+                        color: "var(--blue-dark)",
+                        opacity: 0.4,
+                      }}
+                    >
                       {formatDate(memory.created_at)}
                     </span>
                   </div>
@@ -348,9 +430,21 @@ export default function MemoriesPage() {
             <button
               onClick={() => setSelectedMemory(null)}
               className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center z-10"
-              style={{ backgroundColor: "var(--cream)", color: "var(--blue-dark)" }}
+              style={{
+                backgroundColor: "var(--cream)",
+                color: "var(--blue-dark)",
+              }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -359,13 +453,20 @@ export default function MemoriesPage() {
               <div className="text-5xl mb-4">❤️</div>
               <div
                 className="text-6xl font-bold mb-2 leading-none"
-                style={{ color: "var(--orange-warm)", opacity: 0.2, fontFamily: "Georgia, serif" }}
+                style={{
+                  color: "var(--orange-warm)",
+                  opacity: 0.2,
+                  fontFamily: "Georgia, serif",
+                }}
               >
                 "
               </div>
               <p
                 className="text-xl leading-relaxed mb-6"
-                style={{ color: "var(--blue-dark)", fontFamily: "var(--font-body)" }}
+                style={{
+                  color: "var(--blue-dark)",
+                  fontFamily: "var(--font-body)",
+                }}
               >
                 {selectedMemory.message}
               </p>
@@ -379,20 +480,34 @@ export default function MemoriesPage() {
               )}
               <div
                 className="flex items-center justify-center gap-3 pt-6"
-                style={{ borderTop: "1px solid rgba(15,43,70,0.08)" }}
+                style={{
+                  borderTop: "1px solid rgba(15,43,70,0.08)",
+                }}
               >
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ backgroundColor: getColorByName(selectedMemory.name) }}
+                  style={{
+                    backgroundColor: getColorByName(selectedMemory.name),
+                  }}
                 >
                   {getInitials(selectedMemory.name)}
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold" style={{ color: "var(--blue-dark)" }}>
+                  <p
+                    className="font-semibold"
+                    style={{ color: "var(--blue-dark)" }}
+                  >
                     {selectedMemory.name}
                   </p>
-                  <p className="text-sm" style={{ color: "var(--blue-dark)", opacity: 0.5 }}>
-                    {selectedMemory.university && `${selectedMemory.university} · `}
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: "var(--blue-dark)",
+                      opacity: 0.5,
+                    }}
+                  >
+                    {selectedMemory.university &&
+                      `${selectedMemory.university} · `}
                     {formatDate(selectedMemory.created_at)}
                   </p>
                 </div>
