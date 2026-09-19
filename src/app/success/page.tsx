@@ -1,110 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function SuccessPage() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
+  const [show, setShow] = useState(false);
+  useEffect(() => { setTimeout(() => setShow(true), 50); }, []);
 
   return (
-    <main
-      className="relative flex min-h-screen items-center justify-center overflow-hidden"
-      style={{ backgroundColor: "var(--cream)" }}
-    >
-      <div
-        className={`transition-all duration-1000 ${
-          visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-        }`}
-        style={{
-          direction: "rtl",
-          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-        }}
-      >
-        <div
-          className="blob-blue absolute -top-32 -left-32 w-64 h-64 rounded-full opacity-30 blur-3xl"
-          aria-hidden="true"
-        />
-        <div
-          className="blob-orange absolute -bottom-32 -right-32 w-72 h-72 rounded-full opacity-30 blur-3xl"
-          aria-hidden="true"
-        />
-        <div className="pattern-dots absolute inset-0 opacity-10 pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col items-center gap-6 px-6">
-          <div
-            className="rounded-full flex items-center justify-center shadow-2xl"
-            style={{
-              width: 100,
-              height: 100,
-              backgroundColor: "var(--success, #059669)",
-              boxShadow: "0 20px 60px rgba(5, 150, 105, 0.35)",
-            }}
-          >
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-
-          <div className="text-center" dir="rtl">
-            <h1
-              className="text-4xl md:text-5xl font-bold mb-4"
-              style={{
-                animation: "fadeUp 0.8s ease-out 0.3s both",
-                fontFamily: "var(--font-heading, 'Noto Kufi Arabic', sans-serif)",
-              }}
-            >
-              شكراً من القلب ❤️
-            </h1>
-            <p
-              className="text-lg md:text-xl mb-2"
-              style={{ color: "#555" }}
-            >
-              ذكرتك اتحفظت بنجاح في كتاب الذكريات
-            </p>
-            <p
-              className="text-base md:text-lg"
-              style={{ color: "#888" }}
-            >
-              رح نحتفظ فيها للأبد
-            </p>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-4 mt-4" dir="rtl">
-            <a href="/" className="btn btn-primary">
-              الرئيسية
-            </a>
-            <a href="/memories" className="btn btn-outline">
-              شوف الذكريات
-            </a>
-          </div>
+    <main className="min-h-screen bg-[var(--slate-50)] flex items-center justify-center px-5">
+      <div className={`text-center max-w-sm transition-all duration-500 ${show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center bg-[var(--green)]" style={{ boxShadow: "0 8px 32px rgba(34,197,94,0.25)" }}>
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <h1 className="text-2xl md:text-3xl font-extrabold mb-2" style={{ color: "var(--slate-900)" }}>شكراً من القلب ❤️</h1>
+        <p className="text-sm mb-1" style={{ color: "var(--slate-500)" }}>ذكرتك اتحفظت بنجاح</p>
+        <p className="text-sm mb-8" style={{ color: "var(--slate-400)" }}>رح نحتفظ فيها للأبد</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/" className="btn btn-primary">الرئيسية</Link>
+          <Link href="/memories" className="btn btn-outline">شوف الذكريات</Link>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes fadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </main>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface Memory {
   id: string;
@@ -15,500 +14,169 @@ interface Memory {
   is_favorite: boolean;
 }
 
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash);
-}
-
-const avatarColors = [
-  "#e89b2d",
-  "#059669",
-  "#0f2b46",
-  "#e74c3c",
-  "#8e44ad",
-  "#2980b9",
-  "#16a085",
-  "#d35400",
-  "#27ae60",
-  "#c0392b",
-];
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return parts[0][0] + parts[1][0];
-  }
-  return name.substring(0, 2);
-}
-
-function getColorByName(name: string): string {
-  return avatarColors[hashCode(name) % avatarColors.length];
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
+const COLORS = ["#1e293b", "#3b82f6", "#059669", "#7c3aed", "#dc2626", "#d97706", "#0891b2", "#c026d3"];
+const hash = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h); return Math.abs(h); };
+const color = (n: string) => COLORS[hash(n) % COLORS.length];
+const initials = (n: string) => n.split(" ").map((w) => w[0]).join("").slice(0, 2);
+const fmt = (d: string) => new Date(d).toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
 
 export default function MemoriesPage() {
-  const router = useRouter();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Memory | null>(null);
 
-  const fetchMemories = useCallback(async () => {
+  const fetchM = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const res = await fetch("/api/memories?limit=100");
-      if (!res.ok) throw new Error("Failed to load memories");
-      const data = await res.json();
-      setMemories(Array.isArray(data) ? data : data.memories || []);
-    } catch (e: any) {
-      setError(e?.message || "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+      const r = await fetch("/api/memories?limit=100");
+      if (!r.ok) throw new Error("فشل التحميل");
+      const d = await r.json();
+      setMemories(d.memories || []);
+    } catch { setError("حصل مشكلة، حاول تاني"); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    fetchMemories();
-  }, [fetchMemories]);
+  useEffect(() => { fetchM(); }, [fetchM]);
 
-  useEffect(() => {
-    if (!loading && memories.length > 0) {
-      const timers: NodeJS.Timeout[] = [];
-      memories.forEach((_, i) => {
-        const t = setTimeout(() => {
-          setVisibleCards((prev) => new Set(prev).add(i));
-        }, i * 80);
-        timers.push(t);
-      });
-      return () => timers.forEach(clearTimeout);
-    }
-  }, [loading, memories]);
+  const filtered = search.trim()
+    ? memories.filter((m) => m.name.includes(search) || m.message.includes(search))
+    : memories;
 
-  const pickRandom = useCallback(() => {
-    if (memories.length === 0) return;
-    const idx = Math.floor(Math.random() * memories.length);
-    setSelectedMemory(memories[idx]);
-  }, [memories]);
-
-  const filteredMemories = useMemo(() => {
-    if (!search.trim()) return memories;
-    const q = search.trim().toLowerCase();
-    return memories.filter(
-      (m) =>
-        m.message.toLowerCase().includes(q) ||
-        m.name.toLowerCase().includes(q)
-    );
-  }, [memories, search]);
-
-  const showSearch = memories.length > 3;
-
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
-        }}
-      >
-        <div className="blob-blue" />
-        <div className="blob-orange" />
-        <div className="pattern-dots" />
-        <div className="text-center z-10 relative">
-          <div
-            className="spinner mx-auto mb-4"
-            style={{ width: 48, height: 48 }}
-          />
-          <p
-            style={{
-              color: "var(--blue-dark)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            جاري تحميل الذكريات...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
-        }}
-      >
-        <div className="blob-blue" />
-        <div className="blob-orange" />
-        <div className="pattern-dots" />
-        <div className="text-center z-10 relative">
-          <div className="text-6xl mb-4">😵</div>
-          <p
-            style={{
-              color: "var(--blue-dark)",
-              fontFamily: "var(--font-body)",
-            }}
-            className="text-lg mb-4"
-          >
-            {error}
-          </p>
-          <button onClick={fetchMemories} className="btn btn-primary">
-            إعادة المحاولة
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const pickRandom = () => {
+    if (!memories.length) return;
+    setSelected(memories[Math.floor(Math.random() * memories.length)]);
+  };
 
   return (
-    <div
-      className="min-h-screen relative overflow-hidden"
-      style={{
-        background: "linear-gradient(135deg, var(--cream) 0%, #fdf6e3 50%, #fef9ef 100%)",
-      }}
-    >
-      <div className="blob-blue" />
-      <div className="blob-orange" />
-      <div className="pattern-dots" />
-
-      <header
-        className="glass sticky top-0 z-40"
-        style={{
-          borderBottom: "1px solid rgba(15,43,70,0.08)",
-          backdropFilter: "blur(16px)",
-        }}
-      >
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="btn btn-ghost text-sm"
-            style={{ color: "var(--blue-dark)" }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ marginLeft: 6 }}
-            >
-              <path d="M15 18l-6-6 6-6" />
+    <main className="min-h-screen bg-[var(--slate-50)]">
+      {/* Header */}
+      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-[var(--slate-200)]">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="btn btn-ghost btn-sm">
+            <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
             الرئيسية
           </Link>
           <div className="flex items-center gap-2">
-            <button onClick={pickRandom} className="btn btn-accent text-sm">
-              فاجئني
-            </button>
-            <button
-              onClick={() => router.push("/write")}
-              className="btn btn-primary text-sm"
-            >
-              اكتب
-            </button>
+            <button onClick={pickRandom} className="btn btn-amber btn-sm">🎲 فاجئني</button>
+            <Link href="/write" className="btn btn-primary btn-sm">✏️ اكتب</Link>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10">
-        <div className="text-center mb-8">
-          <h1
-            className="text-3xl md:text-4xl font-bold mb-2"
-            style={{
-              color: "var(--blue-dark)",
-              fontFamily: "var(--font-heading)",
-            }}
-          >
-            كل الذكريات
-          </h1>
-          <p
-            style={{ color: "var(--orange-warm)" }}
-            className="text-lg"
-          >
-            {memories.length} ذكرى محفوظة
-          </p>
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        {/* Title */}
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: "var(--slate-900)" }}>كل الذكريات</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--slate-400)" }}>{memories.length} ذكرى</p>
         </div>
 
-        {showSearch && (
-          <div className="max-w-md mx-auto mb-10 relative">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--blue-dark)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                position: "absolute",
-                right: 14,
-                top: "50%",
-                transform: "translateY(-50%)",
-                opacity: 0.4,
-              }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        {/* Search */}
+        {memories.length > 3 && (
+          <div className="mb-6 relative">
+            <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="var(--slate-400)" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
-            <input
-              type="text"
-              className="input w-full"
-              placeholder="ابحث في الذكريات..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: 40, paddingRight: 44 }}
-            />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث..." className="input pr-10" />
           </div>
         )}
 
-        {memories.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-6">📖</div>
-            <h2
-              className="text-2xl font-bold mb-3"
-              style={{
-                color: "var(--blue-dark)",
-                fontFamily: "var(--font-heading)",
-              }}
-            >
-              لسه أول صفحة
-            </h2>
-            <p
-              style={{ color: "var(--blue-dark)", opacity: 0.6 }}
-              className="mb-6"
-            >
-              كن أول من يكتب ذكرى في هذا الكتاب
-            </p>
-            <Link href="/write" className="btn btn-primary">
-              اكتب ذكرتك الأولى
-            </Link>
+        {/* Loading */}
+        {loading && (
+          <div className="flex flex-col items-center py-20 gap-3">
+            <div className="spinner" style={{ width: 32, height: 32, borderColor: "var(--slate-200)", borderTopColor: "var(--blue)" }} />
+            <p className="text-sm" style={{ color: "var(--slate-400)" }}>جاري التحميل...</p>
           </div>
-        ) : filteredMemories.length === 0 ? (
+        )}
+
+        {/* Error */}
+        {error && !loading && (
           <div className="text-center py-20">
-            <div className="text-6xl mb-6">🔍</div>
-            <h2
-              className="text-2xl font-bold mb-3"
-              style={{
-                color: "var(--blue-dark)",
-                fontFamily: "var(--font-heading)",
-              }}
-            >
-              لا توجد نتائج
-            </h2>
-            <p style={{ color: "var(--blue-dark)", opacity: 0.6 }}>
-              جرّب كلمات مختلفة
-            </p>
+            <p className="text-sm mb-3" style={{ color: "var(--red)" }}>{error}</p>
+            <button onClick={fetchM} className="btn btn-outline btn-sm">حاول تاني</button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredMemories.map((memory, i) => (
-              <div
-                key={memory.id}
-                className="card card-hover cursor-pointer"
-                style={{
-                  opacity: visibleCards.has(i) ? 1 : 0,
-                  transform: visibleCards.has(i)
-                    ? "translateY(0)"
-                    : "translateY(24px)",
-                  transition: "opacity 0.5s ease, transform 0.5s ease",
-                }}
-                onClick={() => setSelectedMemory(memory)}
-              >
-                <div className="relative p-6">
-                  <div
-                    className="absolute top-3 left-4 text-7xl font-bold leading-none select-none pointer-events-none"
-                    style={{
-                      color: "var(--orange-warm)",
-                      opacity: 0.15,
-                      fontFamily: "Georgia, serif",
-                    }}
-                  >
-                    "
+        )}
+
+        {/* Empty */}
+        {!loading && !error && memories.length === 0 && (
+          <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-[var(--slate-100)]">
+              <span className="text-3xl">📖</span>
+            </div>
+            <h2 className="text-lg font-bold mb-1" style={{ color: "var(--slate-800)" }}>لسه أول صفحة</h2>
+            <p className="text-sm mb-5" style={{ color: "var(--slate-400)" }}>كن أول من يكتب ذكرى</p>
+            <Link href="/write" className="btn btn-primary">اكتب ذكرتك</Link>
+          </div>
+        )}
+
+        {/* No results */}
+        {!loading && !error && memories.length > 0 && filtered.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-sm" style={{ color: "var(--slate-400)" }}>مفيش نتائج</p>
+          </div>
+        )}
+
+        {/* Cards */}
+        {!loading && filtered.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((m) => (
+              <div key={m.id} className="card card-hover cursor-pointer p-5" onClick={() => setSelected(m)}>
+                {/* Quote mark */}
+                <div className="text-4xl font-bold leading-none mb-2 select-none" style={{ color: "var(--amber)", opacity: 0.3, fontFamily: "Georgia, serif" }}>&quot;</div>
+
+                {/* Message */}
+                <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--slate-700)" }}>{m.message}</p>
+
+                {/* Image */}
+                {m.image_url && (
+                  <img src={m.image_url} alt="" className="w-full h-40 object-cover rounded-lg border border-[var(--slate-100)] mb-4" />
+                )}
+
+                {/* Footer */}
+                <div className="flex items-center gap-3 pt-3 border-t border-[var(--slate-100)]">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: color(m.name) }}>
+                    {initials(m.name)}
                   </div>
-                  <p
-                    className="text-lg leading-relaxed mb-4 relative z-10"
-                    style={{
-                      color: "var(--blue-dark)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    {memory.message}
-                  </p>
-                  {memory.image_url && (
-                    <img
-                      src={memory.image_url}
-                      alt=""
-                      className="w-full rounded-xl border-2 mb-4 object-cover"
-                      style={{
-                        borderColor: "rgba(15,43,70,0.08)",
-                        maxHeight: 240,
-                      }}
-                    />
-                  )}
-                  <div
-                    className="flex items-center gap-3 pt-3"
-                    style={{
-                      borderTop: "1px solid rgba(15,43,70,0.08)",
-                    }}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                      style={{
-                        backgroundColor: getColorByName(memory.name),
-                      }}
-                    >
-                      {getInitials(memory.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="font-semibold text-sm truncate"
-                        style={{ color: "var(--blue-dark)" }}
-                      >
-                        {memory.name}
-                      </p>
-                      {memory.university && (
-                        <p
-                          className="text-xs truncate"
-                          style={{
-                            color: "var(--blue-dark)",
-                            opacity: 0.5,
-                          }}
-                        >
-                          {memory.university}
-                        </p>
-                      )}
-                    </div>
-                    <span
-                      className="text-xs shrink-0"
-                      style={{
-                        color: "var(--blue-dark)",
-                        opacity: 0.4,
-                      }}
-                    >
-                      {formatDate(memory.created_at)}
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--slate-800)" }}>{m.name}</p>
+                    {m.university && <p className="text-xs truncate" style={{ color: "var(--slate-400)" }}>{m.university}</p>}
                   </div>
+                  <span className="text-xs shrink-0" style={{ color: "var(--slate-400)" }}>{fmt(m.created_at)}</span>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </main>
+      </div>
 
-      {selectedMemory && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{
-            backgroundColor: "rgba(15,43,70,0.6)",
-            backdropFilter: "blur(8px)",
-          }}
-          onClick={() => setSelectedMemory(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto relative shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSelectedMemory(null)}
-              className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center z-10"
-              style={{
-                backgroundColor: "var(--cream)",
-                color: "var(--blue-dark)",
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+      {/* Modal */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setSelected(null)} className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center bg-[var(--slate-100)] hover:bg-[var(--slate-200)] transition-colors z-10">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="var(--slate-500)" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <div className="p-8 text-center">
-              <div className="text-5xl mb-4">❤️</div>
-              <div
-                className="text-6xl font-bold mb-2 leading-none"
-                style={{
-                  color: "var(--orange-warm)",
-                  opacity: 0.2,
-                  fontFamily: "Georgia, serif",
-                }}
-              >
-                "
-              </div>
-              <p
-                className="text-xl leading-relaxed mb-6"
-                style={{
-                  color: "var(--blue-dark)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                {selectedMemory.message}
-              </p>
-              {selectedMemory.image_url && (
-                <img
-                  src={selectedMemory.image_url}
-                  alt=""
-                  className="w-full rounded-xl border-2 mb-6 object-cover"
-                  style={{ borderColor: "rgba(15,43,70,0.08)" }}
-                />
+            <div className="p-6 text-center">
+              <div className="text-4xl mb-3">❤️</div>
+              <div className="text-5xl font-bold mb-1 select-none" style={{ color: "var(--amber)", opacity: 0.2, fontFamily: "Georgia, serif" }}>&quot;</div>
+              <p className="text-base leading-relaxed mb-5" style={{ color: "var(--slate-800)" }}>{selected.message}</p>
+              {selected.image_url && (
+                <img src={selected.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-5 border border-[var(--slate-100)]" />
               )}
-              <div
-                className="flex items-center justify-center gap-3 pt-6"
-                style={{
-                  borderTop: "1px solid rgba(15,43,70,0.08)",
-                }}
-              >
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{
-                    backgroundColor: getColorByName(selectedMemory.name),
-                  }}
-                >
-                  {getInitials(selectedMemory.name)}
+              <div className="flex items-center justify-center gap-3 pt-4 border-t border-[var(--slate-100)]">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: color(selected.name) }}>
+                  {initials(selected.name)}
                 </div>
                 <div className="text-right">
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--blue-dark)" }}
-                  >
-                    {selectedMemory.name}
-                  </p>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: "var(--blue-dark)",
-                      opacity: 0.5,
-                    }}
-                  >
-                    {selectedMemory.university &&
-                      `${selectedMemory.university} · `}
-                    {formatDate(selectedMemory.created_at)}
+                  <p className="text-sm font-semibold" style={{ color: "var(--slate-800)" }}>{selected.name}</p>
+                  <p className="text-xs" style={{ color: "var(--slate-400)" }}>
+                    {selected.university && `${selected.university} · `}{fmt(selected.created_at)}
                   </p>
                 </div>
               </div>
@@ -516,6 +184,6 @@ export default function MemoriesPage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
