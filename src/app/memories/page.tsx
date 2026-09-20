@@ -17,18 +17,16 @@ interface Memory {
   is_favorite: boolean;
 }
 
-const COLORS = ["#1e293b", "#3b82f6", "#059669", "#7c3aed", "#dc2626", "#d97706", "#0891b2", "#c026d3"];
-const hash = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h); return Math.abs(h); };
-const color = (n: string) => COLORS[hash(n) % COLORS.length];
-const initials = (n: string) => n.split(" ").map((w) => w[0]).join("").slice(0, 2);
-const fmt = (d: string) => new Date(d).toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
+const fmt = (d: string) => new Date(d).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+const fmtShort = (d: string) => new Date(d).toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
 
 export default function MemoriesPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Memory | null>(null);
+  const [current, setCurrent] = useState(0);
+  const [flipping, setFlipping] = useState<"next" | "prev" | null>(null);
+  const [showCover, setShowCover] = useState(true);
 
   const fetchM = useCallback(async () => {
     setLoading(true);
@@ -37,141 +35,256 @@ export default function MemoriesPage() {
       if (!r.ok) throw new Error("فشل التحميل");
       const d = await r.json();
       setMemories(d.memories || []);
-    } catch { setError("حصل مشكلة، حاول تاني"); }
-    finally { setLoading(false); }
+    } catch {
+      setError("حصل مشكلة، حاول تاني");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchM(); }, [fetchM]);
+  useEffect(() => {
+    fetchM();
+  }, [fetchM]);
 
-  const filtered = search.trim()
-    ? memories.filter((m) => m.name.includes(search) || m.message.includes(search) || (m.nice_moment && m.nice_moment.includes(search)))
-    : memories;
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (showCover) {
+        if (e.key === "Enter" || e.key === " ") openNotebook();
+        return;
+      }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        if (flipping) return;
+        if (e.key === "ArrowRight" && current > 0) goPrev();
+        if (e.key === "ArrowLeft" && current < memories.length - 1) goNext();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  });
 
-  const pickRandom = () => {
-    if (!memories.length) return;
-    setSelected(memories[Math.floor(Math.random() * memories.length)]);
+  const openNotebook = () => {
+    setShowCover(false);
+    setCurrent(0);
   };
 
-  return (
-    <main className="min-h-screen bg-[var(--slate-50)]">
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-[var(--slate-200)]">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="btn btn-ghost btn-sm">
-            <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
-            الرئيسية
-          </Link>
-          <div className="flex items-center gap-2">
-            <button onClick={pickRandom} className="btn btn-amber btn-sm">🎲 فاجئني</button>
-            <Link href="/write" className="btn btn-primary btn-sm">✏️ اكتب</Link>
-          </div>
+  const goNext = () => {
+    if (current >= memories.length - 1 || flipping) return;
+    setFlipping("next");
+    setTimeout(() => {
+      setCurrent((p) => p + 1);
+      setFlipping(null);
+    }, 500);
+  };
+
+  const goPrev = () => {
+    if (current <= 0 || flipping) return;
+    setFlipping("prev");
+    setTimeout(() => {
+      setCurrent((p) => p - 1);
+      setFlipping(null);
+    }, 500);
+  };
+
+  if (loading) {
+    return (
+      <div className="notebook-bg flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="book-loader" />
+          <p style={{ color: "#8b7355", fontFamily: "Georgia, serif" }}>جاري فتح الدفتر...</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: "var(--slate-900)" }}>كل الذكريات</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--slate-400)" }}>{memories.length} ذكرى</p>
+  if (error) {
+    return (
+      <div className="notebook-bg flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-lg mb-4" style={{ color: "#8b7355" }}>{error}</p>
+          <button onClick={fetchM} className="btn btn-outline">حاول تاني</button>
         </div>
+      </div>
+    );
+  }
 
-        {memories.length > 3 && (
-          <div className="mb-6 relative">
-            <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="var(--slate-400)" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث..." className="input pr-10" />
-          </div>
-        )}
+  if (memories.length === 0) {
+    return (
+      <div className="notebook-bg flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-6xl mb-4">📖</div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: "#5c4a3a", fontFamily: "Georgia, serif" }}>
+            الدفتر فاضي
+          </h2>
+          <p className="text-sm mb-6" style={{ color: "#8b7355" }}>كن أول من يكتب ذكرى في هذا الدفتر</p>
+          <Link href="/write" className="btn btn-primary btn-lg">اكتب ذكرتك</Link>
+        </div>
+      </div>
+    );
+  }
 
-        {loading && (
-          <div className="flex flex-col items-center py-20 gap-3">
-            <div className="spinner" style={{ width: 32, height: 32, borderColor: "var(--slate-200)", borderTopColor: "var(--blue)" }} />
-            <p className="text-sm" style={{ color: "var(--slate-400)" }}>جاري التحميل...</p>
-          </div>
-        )}
+  return (
+    <div className="notebook-bg min-h-screen overflow-hidden">
+      {showCover ? (
+        <div className="cover-container">
+          <div className="cover">
+            <div className="cover-decoration cover-decoration-1" />
+            <div className="cover-decoration cover-decoration-2" />
+            <div className="cover-binding" />
 
-        {error && !loading && (
-          <div className="text-center py-20">
-            <p className="text-sm mb-3" style={{ color: "var(--red)" }}>{error}</p>
-            <button onClick={fetchM} className="btn btn-outline btn-sm">حاول تاني</button>
-          </div>
-        )}
+            <div className="cover-content">
+              <div className="cover-ornament">&#10053;</div>
+              <h1 className="cover-title">دفتر الذكريات</h1>
+              <div className="cover-line" />
+              <p className="cover-subtitle">
+                {memories.length === 1
+                  ? "ذكرى واحدة جميلة"
+                  : `${memories.length} ذكرى جميلة`}
+              </p>
+              <div className="cover-ornament">&#10053;</div>
 
-        {!loading && !error && memories.length === 0 && (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-[var(--slate-100)]">
-              <span className="text-3xl">📖</span>
+              <button onClick={openNotebook} className="btn btn-lg cover-btn">
+                افتح الدفتر
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
+                </svg>
+              </button>
             </div>
-            <h2 className="text-lg font-bold mb-1" style={{ color: "var(--slate-800)" }}>لسه أول صفحة</h2>
-            <p className="text-sm mb-5" style={{ color: "var(--slate-400)" }}>كن أول من يكتب ذكرى</p>
-            <Link href="/write" className="btn btn-primary">اكتب ذكرتك</Link>
           </div>
-        )}
-
-        {!loading && !error && memories.length > 0 && filtered.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-sm" style={{ color: "var(--slate-400)" }}>مفيش نتائج</p>
+        </div>
+      ) : (
+        <>
+          {/* Top nav */}
+          <div className="sticky top-0 z-40 notebook-nav">
+            <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+              <Link href="/" className="btn btn-ghost btn-sm" style={{ color: "#5c4a3a" }}>
+                <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+                الرئيسية
+              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCover(true)}
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: "#5c4a3a" }}
+                >
+                  📖 الغلاف
+                </button>
+                <Link href="/write" className="btn btn-primary btn-sm">✏️ اكتب</Link>
+              </div>
+            </div>
           </div>
-        )}
 
-        {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map((m) => (
-              <div key={m.id} className="card card-hover cursor-pointer p-5" onClick={() => setSelected(m)}>
-                <div className="text-4xl font-bold leading-none mb-2 select-none" style={{ color: "var(--amber)", opacity: 0.3, fontFamily: "Georgia, serif" }}>&quot;</div>
+          {/* Book area */}
+          <div className="book-area">
+            {/* Page shadow */}
+            <div className="book-shadow" />
 
-                <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--slate-700)" }}>{m.message}</p>
+            {/* The notebook */}
+            <div className="notebook">
+              <div className="notebook-spine" />
 
-                {m.nice_moment && m.show_nice_moment && (
-                  <div className="p-3 rounded-lg mb-3" style={{ background: "var(--amber-light)" }}>
-                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو</p>
-                    <p className="text-sm" style={{ color: "var(--slate-700)" }}>{m.nice_moment}</p>
+              {/* Previous page (visible behind) */}
+              <div className={`page page-back ${flipping === "next" ? "flip-out" : ""}`}>
+                {current > 0 && (
+                  <div className="page-content" key={`prev-${current}`}>
+                    <PageContent m={memories[current - 1]} />
                   </div>
                 )}
-
-                {m.image_url && m.show_image && (
-                  <img src={m.image_url} alt="" className="w-full h-40 object-cover rounded-lg border border-[var(--slate-100)] mb-3" />
-                )}
-
-                <div className="flex items-center gap-3 pt-3 border-t border-[var(--slate-100)]">
-                  <span className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(m.created_at)}</span>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setSelected(null)} className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center bg-[var(--slate-100)] hover:bg-[var(--slate-200)] transition-colors z-10">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="var(--slate-500)" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="p-6 text-center">
-              <div className="text-4xl mb-3">❤️</div>
-              <div className="text-5xl font-bold mb-1 select-none" style={{ color: "var(--amber)", opacity: 0.2, fontFamily: "Georgia, serif" }}>&quot;</div>
-              <p className="text-base leading-relaxed mb-4" style={{ color: "var(--slate-800)" }}>{selected.message}</p>
-              {selected.nice_moment && selected.show_nice_moment && (
-                <div className="p-4 rounded-xl mb-4 text-right" style={{ background: "var(--amber-light)" }}>
-                  <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو حصل</p>
-                  <p className="text-sm" style={{ color: "var(--slate-700)" }}>{selected.nice_moment}</p>
+              {/* Current page */}
+              <div className={`page page-front ${flipping === "next" ? "flip-in-next" : flipping === "prev" ? "flip-in-prev" : ""}`}>
+                <div className="page-content" key={`curr-${current}`}>
+                  <div className="page-header">
+                    <span className="page-number">{current + 1} / {memories.length}</span>
+                    <span className="page-date">{fmt(memories[current].created_at)}</span>
+                  </div>
+                  <PageContent m={memories[current]} />
                 </div>
-              )}
-              {selected.image_url && selected.show_image && (
-                <img src={selected.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-5 border border-[var(--slate-100)]" />
-              )}
-              <div className="flex items-center justify-center pt-4 border-t border-[var(--slate-100)]">
-                <span className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(selected.created_at)}</span>
               </div>
             </div>
+
+            {/* Navigation */}
+            <div className="nav-buttons">
+              <button
+                onClick={goPrev}
+                disabled={current <= 0 || !!flipping}
+                className="nav-btn"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+
+              <div className="page-dots">
+                {memories.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (flipping || i === current) return;
+                      setFlipping(i > current ? "next" : "prev");
+                      setTimeout(() => {
+                        setCurrent(i);
+                        setFlipping(null);
+                      }, 500);
+                    }}
+                    className={`page-dot ${i === current ? "active" : ""}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={goNext}
+                disabled={current >= memories.length - 1 || !!flipping}
+                className="nav-btn"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Page corners */}
+            <div className="page-corner page-corner-right" onClick={goNext} />
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PageContent({ m }: { m: Memory }) {
+  return (
+    <div className="page-text">
+      {m.show_name && (
+        <p className="page-author" style={{ fontFamily: "Georgia, serif" }}>
+          ~ {m.name} ~
+        </p>
+      )}
+
+      <div className="page-quote">&ldquo;</div>
+
+      <p className="page-message">{m.message}</p>
+
+      {m.nice_moment && m.show_nice_moment && (
+        <div className="page-moment">
+          <p className="page-moment-label">&#10024; موقف حلو</p>
+          <p className="page-moment-text">{m.nice_moment}</p>
         </div>
       )}
-    </main>
+
+      {m.image_url && m.show_image && (
+        <img
+          src={m.image_url}
+          alt=""
+          className="page-image"
+        />
+      )}
+
+      <div className="page-footer">
+        <span className="page-line" />
+      </div>
+    </div>
   );
 }
