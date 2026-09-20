@@ -132,13 +132,7 @@ export default function MemoriesPage() {
                 )}
 
                 <div className="flex items-center gap-3 pt-3 border-t border-[var(--slate-100)]">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: color(m.name) }}>
-                    {initials(m.name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: "var(--slate-800)" }}>{m.name}</p>
-                  </div>
-                  <span className="text-xs shrink-0" style={{ color: "var(--slate-400)" }}>{fmt(m.created_at)}</span>
+                  <span className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(m.created_at)}</span>
                 </div>
               </div>
             ))}
@@ -168,14 +162,8 @@ export default function MemoriesPage() {
               {selected.image_url && (
                 <img src={selected.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-5 border border-[var(--slate-100)]" />
               )}
-              <div className="flex items-center justify-center gap-3 pt-4 border-t border-[var(--slate-100)]">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: color(selected.name) }}>
-                  {initials(selected.name)}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold" style={{ color: "var(--slate-800)" }}>{selected.name}</p>
-                  <p className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(selected.created_at)}</p>
-                </div>
+              <div className="flex items-center justify-center pt-4 border-t border-[var(--slate-100)]">
+                <span className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(selected.created_at)}</span>
               </div>
             </div>
           </div>
