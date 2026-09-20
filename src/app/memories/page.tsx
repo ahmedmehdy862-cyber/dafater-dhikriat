@@ -10,6 +10,9 @@ interface Memory {
   nice_moment: string | null;
   image_url: string | null;
   created_at: string;
+  show_name: boolean;
+  show_nice_moment: boolean;
+  show_image: boolean;
   is_public: boolean;
   is_favorite: boolean;
 }
@@ -120,15 +123,15 @@ export default function MemoriesPage() {
 
                 <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--slate-700)" }}>{m.message}</p>
 
-                {m.nice_moment && (
+                {m.nice_moment && m.show_nice_moment && (
                   <div className="p-3 rounded-lg mb-3" style={{ background: "var(--amber-light)" }}>
                     <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو</p>
                     <p className="text-sm" style={{ color: "var(--slate-700)" }}>{m.nice_moment}</p>
                   </div>
                 )}
 
-                {m.image_url && (
-                  <img src={m.image_url} alt="" className="w-full h-40 object-cover rounded-lg border border-[var(--slate-100)] mb-4" />
+                {m.image_url && m.show_image && (
+                  <img src={m.image_url} alt="" className="w-full h-40 object-cover rounded-lg border border-[var(--slate-100)] mb-3" />
                 )}
 
                 <div className="flex items-center gap-3 pt-3 border-t border-[var(--slate-100)]">
@@ -153,13 +156,13 @@ export default function MemoriesPage() {
               <div className="text-4xl mb-3">❤️</div>
               <div className="text-5xl font-bold mb-1 select-none" style={{ color: "var(--amber)", opacity: 0.2, fontFamily: "Georgia, serif" }}>&quot;</div>
               <p className="text-base leading-relaxed mb-4" style={{ color: "var(--slate-800)" }}>{selected.message}</p>
-              {selected.nice_moment && (
+              {selected.nice_moment && selected.show_nice_moment && (
                 <div className="p-4 rounded-xl mb-4 text-right" style={{ background: "var(--amber-light)" }}>
                   <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو حصل</p>
                   <p className="text-sm" style={{ color: "var(--slate-700)" }}>{selected.nice_moment}</p>
                 </div>
               )}
-              {selected.image_url && (
+              {selected.image_url && selected.show_image && (
                 <img src={selected.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-5 border border-[var(--slate-100)]" />
               )}
               <div className="flex items-center justify-center pt-4 border-t border-[var(--slate-100)]">

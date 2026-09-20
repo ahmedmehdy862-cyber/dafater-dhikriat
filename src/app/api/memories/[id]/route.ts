@@ -36,20 +36,14 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, is_favorite } = body;
-
-    // Validate status
-    const validStatuses = ["pending", "approved", "rejected", "hidden"];
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: "حالة غير صحيحة" },
-        { status: 400 }
-      );
-    }
+    const { status, is_favorite, show_name, show_nice_moment, show_image } = body;
 
     const updateData: Record<string, unknown> = {};
     if (status) updateData.status = status;
     if (typeof is_favorite === "boolean") updateData.is_favorite = is_favorite;
+    if (typeof show_name === "boolean") updateData.show_name = show_name;
+    if (typeof show_nice_moment === "boolean") updateData.show_nice_moment = show_nice_moment;
+    if (typeof show_image === "boolean") updateData.show_image = show_image;
 
     const { data, error } = await supabaseAdmin
       .from("memories")
