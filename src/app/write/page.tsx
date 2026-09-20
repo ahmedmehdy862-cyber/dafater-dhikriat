@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const MAX = 500;
+const MIN = 30;
 
 export default function WritePage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function WritePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const nameOk = name.trim().length >= 2;
-  const msgOk = message.trim().length >= 10 && message.length <= MAX;
+  const msgOk = message.trim().length >= MIN;
 
   function onImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -49,8 +49,7 @@ export default function WritePage() {
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim() || name.trim().length < 2) e.name = "الاسم لازم يكون حرفين على الأقل";
-    if (!message.trim() || message.trim().length < 10) e.message = "الرسالة لازم يكون فيها 10 أحرف على الأقل";
-    if (message.length > MAX) e.message = `الرسالة مش ممكن تتجاوز ${MAX} حرف`;
+    if (!message.trim() || message.trim().length < MIN) e.message = `الرسالة لازم يكون فيها ${MIN} حرف على الأقل`;
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -135,8 +134,8 @@ export default function WritePage() {
             <textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="اكتب اللي تحب تقوله..." rows={4} className="input resize-none" />
             <div className="flex justify-between items-center mt-2">
               {errors.message ? <p className="text-xs font-medium" style={{ color: "var(--red)" }}>{errors.message}</p> : <span />}
-              <span className="text-xs" style={{ color: message.length > MAX ? "var(--red)" : "var(--slate-400)" }}>
-                {message.length}/{MAX}
+              <span className="text-xs" style={{ color: message.length >= MIN ? "var(--green)" : "var(--slate-400)" }}>
+                {message.length} حرف {message.length < MIN && `(محتاج ${MIN - message.length} تاني)`}
               </span>
             </div>
           </div>

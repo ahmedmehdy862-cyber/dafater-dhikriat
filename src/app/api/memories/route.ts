@@ -80,16 +80,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!message || message.trim().length < 10) {
+    if (!message || message.trim().length < 30) {
       return NextResponse.json(
-        { error: "الرسالة لازم يكون فيها 10 أحرف على الأقل" },
-        { status: 400 }
-      );
-    }
-
-    if (message.length > 500) {
-      return NextResponse.json(
-        { error: "الرسالة مش ممكن تتجاوز 500 حرف" },
+        { error: "الرسالة لازم يكون فيها 30 حرف على الأقل" },
         { status: 400 }
       );
     }
