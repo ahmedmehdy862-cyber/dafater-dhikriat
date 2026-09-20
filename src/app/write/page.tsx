@@ -10,7 +10,7 @@ export default function WritePage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
-  const [university, setUniversity] = useState("");
+  const [niceMoment, setNiceMoment] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -74,8 +74,8 @@ export default function WritePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          university: university.trim() || undefined,
           message: message.trim(),
+          nice_moment: niceMoment.trim() || undefined,
           image_url: imageUrl || undefined,
           is_public: isPublic,
         }),
@@ -91,7 +91,6 @@ export default function WritePage() {
 
   return (
     <main className="min-h-screen bg-[var(--slate-50)]">
-      {/* Header */}
       <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-[var(--slate-200)]">
         <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="btn btn-ghost btn-sm">
@@ -105,12 +104,11 @@ export default function WritePage() {
       </div>
 
       <div className="max-w-xl mx-auto px-4 py-8">
-        {/* Progress */}
         <div className="flex items-center gap-2 mb-8 px-2">
-          {[1, 2, 3].map((s) => (
+          {[1, 2].map((s) => (
             <div key={s} className="flex-1">
               <div className="h-1.5 rounded-full transition-all duration-500" style={{
-                background: (s === 1 && nameOk) || (s === 2 && msgOk) || (s === 3)
+                background: (s === 1 && nameOk) || (s === 2 && msgOk)
                   ? "var(--blue)" : "var(--slate-200)"
               }} />
             </div>
@@ -147,11 +145,13 @@ export default function WritePage() {
           <div className="card p-5">
             <p className="text-sm font-bold mb-4" style={{ color: "var(--slate-500)" }}>اختيارات إضافية</p>
 
+            {/* Nice Moment */}
             <div className="mb-4">
-              <label htmlFor="university" className="block text-sm font-medium mb-1.5" style={{ color: "var(--slate-700)" }}>جامعتك أو كيانك</label>
-              <input id="university" type="text" value={university} onChange={(e) => setUniversity(e.target.value)} placeholder="مثلاً: جامعة القاهرة" className="input" />
+              <label htmlFor="niceMoment" className="block text-sm font-medium mb-1.5" style={{ color: "var(--slate-700)" }}>موقف حلو حصل</label>
+              <textarea id="niceMoment" value={niceMoment} onChange={(e) => setNiceMoment(e.target.value)} placeholder="اكتب موقف حلو افتكره..." rows={3} className="input resize-none" />
             </div>
 
+            {/* Image */}
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--slate-700)" }}>صورة تجمعنا</label>
               {imagePreview ? (
@@ -182,14 +182,12 @@ export default function WritePage() {
             </div>
           </div>
 
-          {/* Error */}
           {submitError && (
             <div className="p-3 rounded-lg text-sm font-medium" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "var(--red)" }}>
               {submitError}
             </div>
           )}
 
-          {/* Submit */}
           <button type="submit" disabled={submitting || !nameOk || !msgOk} className="btn btn-primary btn-lg w-full disabled:opacity-40 disabled:cursor-not-allowed">
             {submitting ? <><div className="spinner" /> جاري الإرسال...</> : "سيب كلمتك في الدفتر ❤️"}
           </button>

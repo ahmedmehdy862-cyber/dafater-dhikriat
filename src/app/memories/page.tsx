@@ -6,8 +6,8 @@ import Link from "next/link";
 interface Memory {
   id: string;
   name: string;
-  university: string | null;
   message: string;
+  nice_moment: string | null;
   image_url: string | null;
   created_at: string;
   is_public: boolean;
@@ -41,7 +41,7 @@ export default function MemoriesPage() {
   useEffect(() => { fetchM(); }, [fetchM]);
 
   const filtered = search.trim()
-    ? memories.filter((m) => m.name.includes(search) || m.message.includes(search))
+    ? memories.filter((m) => m.name.includes(search) || m.message.includes(search) || (m.nice_moment && m.nice_moment.includes(search)))
     : memories;
 
   const pickRandom = () => {
@@ -51,7 +51,6 @@ export default function MemoriesPage() {
 
   return (
     <main className="min-h-screen bg-[var(--slate-50)]">
-      {/* Header */}
       <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-[var(--slate-200)]">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="btn btn-ghost btn-sm">
@@ -68,13 +67,11 @@ export default function MemoriesPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Title */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: "var(--slate-900)" }}>كل الذكريات</h1>
           <p className="text-sm mt-1" style={{ color: "var(--slate-400)" }}>{memories.length} ذكرى</p>
         </div>
 
-        {/* Search */}
         {memories.length > 3 && (
           <div className="mb-6 relative">
             <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="var(--slate-400)" strokeWidth={2}>
@@ -84,7 +81,6 @@ export default function MemoriesPage() {
           </div>
         )}
 
-        {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center py-20 gap-3">
             <div className="spinner" style={{ width: 32, height: 32, borderColor: "var(--slate-200)", borderTopColor: "var(--blue)" }} />
@@ -92,7 +88,6 @@ export default function MemoriesPage() {
           </div>
         )}
 
-        {/* Error */}
         {error && !loading && (
           <div className="text-center py-20">
             <p className="text-sm mb-3" style={{ color: "var(--red)" }}>{error}</p>
@@ -100,7 +95,6 @@ export default function MemoriesPage() {
           </div>
         )}
 
-        {/* Empty */}
         {!loading && !error && memories.length === 0 && (
           <div className="text-center py-20">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-[var(--slate-100)]">
@@ -112,37 +106,37 @@ export default function MemoriesPage() {
           </div>
         )}
 
-        {/* No results */}
         {!loading && !error && memories.length > 0 && filtered.length === 0 && (
           <div className="text-center py-16">
             <p className="text-sm" style={{ color: "var(--slate-400)" }}>مفيش نتائج</p>
           </div>
         )}
 
-        {/* Cards */}
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((m) => (
               <div key={m.id} className="card card-hover cursor-pointer p-5" onClick={() => setSelected(m)}>
-                {/* Quote mark */}
                 <div className="text-4xl font-bold leading-none mb-2 select-none" style={{ color: "var(--amber)", opacity: 0.3, fontFamily: "Georgia, serif" }}>&quot;</div>
 
-                {/* Message */}
-                <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--slate-700)" }}>{m.message}</p>
+                <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--slate-700)" }}>{m.message}</p>
 
-                {/* Image */}
+                {m.nice_moment && (
+                  <div className="p-3 rounded-lg mb-3" style={{ background: "var(--amber-light)" }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو</p>
+                    <p className="text-sm" style={{ color: "var(--slate-700)" }}>{m.nice_moment}</p>
+                  </div>
+                )}
+
                 {m.image_url && (
                   <img src={m.image_url} alt="" className="w-full h-40 object-cover rounded-lg border border-[var(--slate-100)] mb-4" />
                 )}
 
-                {/* Footer */}
                 <div className="flex items-center gap-3 pt-3 border-t border-[var(--slate-100)]">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: color(m.name) }}>
                     {initials(m.name)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: "var(--slate-800)" }}>{m.name}</p>
-                    {m.university && <p className="text-xs truncate" style={{ color: "var(--slate-400)" }}>{m.university}</p>}
                   </div>
                   <span className="text-xs shrink-0" style={{ color: "var(--slate-400)" }}>{fmt(m.created_at)}</span>
                 </div>
@@ -152,7 +146,6 @@ export default function MemoriesPage() {
         )}
       </div>
 
-      {/* Modal */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
@@ -165,7 +158,13 @@ export default function MemoriesPage() {
             <div className="p-6 text-center">
               <div className="text-4xl mb-3">❤️</div>
               <div className="text-5xl font-bold mb-1 select-none" style={{ color: "var(--amber)", opacity: 0.2, fontFamily: "Georgia, serif" }}>&quot;</div>
-              <p className="text-base leading-relaxed mb-5" style={{ color: "var(--slate-800)" }}>{selected.message}</p>
+              <p className="text-base leading-relaxed mb-4" style={{ color: "var(--slate-800)" }}>{selected.message}</p>
+              {selected.nice_moment && (
+                <div className="p-4 rounded-xl mb-4 text-right" style={{ background: "var(--amber-light)" }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: "var(--amber-dark)" }}>✨ موقف حلو حصل</p>
+                  <p className="text-sm" style={{ color: "var(--slate-700)" }}>{selected.nice_moment}</p>
+                </div>
+              )}
               {selected.image_url && (
                 <img src={selected.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-5 border border-[var(--slate-100)]" />
               )}
@@ -175,9 +174,7 @@ export default function MemoriesPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold" style={{ color: "var(--slate-800)" }}>{selected.name}</p>
-                  <p className="text-xs" style={{ color: "var(--slate-400)" }}>
-                    {selected.university && `${selected.university} · `}{fmt(selected.created_at)}
-                  </p>
+                  <p className="text-xs" style={{ color: "var(--slate-400)" }}>{fmt(selected.created_at)}</p>
                 </div>
               </div>
             </div>

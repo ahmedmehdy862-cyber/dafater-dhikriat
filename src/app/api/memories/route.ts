@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, university, message, image_url, is_public } = body;
+    const { name, nice_moment, message, image_url, is_public } = body;
 
     // Validate required fields
     if (!name || name.trim().length < 2) {
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       .from("memories")
       .insert({
         name: name.trim(),
-        university: university?.trim() || null,
+        nice_moment: nice_moment?.trim() || null,
         message: message.trim(),
         image_url: image_url || null,
         is_public: is_public !== false,
