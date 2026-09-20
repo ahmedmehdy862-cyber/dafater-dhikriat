@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
       .from("memories")
       .insert({
         name: name.trim(),
-        nice_moment: nice_moment?.trim() || null,
         message: message.trim(),
         image_url: image_url || null,
         is_public: is_public !== false,

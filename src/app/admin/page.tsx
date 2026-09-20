@@ -4,13 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface Memory {
-  id: number;
+  id: string;
   name: string;
-  university: string;
   message: string;
-  image_url: string;
+  nice_moment: string | null;
+  image_url: string | null;
   status: "pending" | "approved" | "rejected" | "hidden";
-  consent_to_publish: boolean;
+  is_public: boolean;
   is_favorite: boolean;
   created_at: string;
 }
@@ -24,35 +24,63 @@ interface Stats {
   universities: number;
 }
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: "قيد المراجعة", color: "bg-yellow-100 text-yellow-800" },
-  approved: { label: "مقبول", color: "bg-green-100 text-green-800" },
-  rejected: { label: "مرفوض", color: "bg-red-100 text-red-800" },
-  hidden: { label: "مخفي", color: "bg-gray-100 text-gray-800" },
+const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
+  pending: { label: "قيد المراجعة", bg: "#fef3c7", text: "#92400e" },
+  approved: { label: "مقبول", bg: "#d1fae5", text: "#065f46" },
+  rejected: { label: "مرفوض", bg: "#fee2e2", text: "#991b1b" },
+  hidden: { label: "مخفي", bg: "#f1f5f9", text: "#475569" },
 };
+
+const FILTER_TABS: { key: string; label: string }[] = [
+  { key: "all", label: "الكل" },
+  { key: "pending", label: "قيد المراجعة" },
+  { key: "approved", label: "مقبول" },
+  { key: "rejected", label: "مرفوض" },
+];
 
 export default function AdminPage() {
   const router = useRouter();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const getHeaders = useCallback((): Record<string, string> => {
-    const token = localStorage.getItem("admin_token");
-    if (token) return { Authorization: `Bearer ${token}` };
-    return {};
+  const getToken = useCallback(() => {
+    return localStorage.getItem("admin_token");
+  }, []);
+
+  const computeStats = useCallback((list: Memory[]) => {
+    setStats({
+      total: list.length,
+      approved: list.filter((m) => m.status === "approved").length,
+      pending: list.filter((m) => m.status === "pending").length,
+      rejected: list.filter((m) => m.status === "rejected").length,
+      hidden: list.filter((m) => m.status === "hidden").length,
+      universities: 0,
+    });
   }, []);
 
   const fetchMemories = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      router.push("/admin/login");
+      return;
+    }
+
     try {
-      const headers = getHeaders();
-      let res = await fetch("/api/admin/memories", { headers });
-      if (!res.ok) res = await fetch("/api/memories?all=true");
+      const res = await fetch("/api/admin/memories", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("admin_token");
+        router.push("/admin/login");
+        return;
+      }
+
       if (!res.ok) throw new Error("Failed to fetch");
+
       const data = await res.json();
       const list: Memory[] = Array.isArray(data) ? data : data.memories || [];
       setMemories(list);
@@ -62,40 +90,44 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [getHeaders, router]);
-
-  const computeStats = (list: Memory[]) => {
-    const universities = new Set(list.map((m) => m.university).filter(Boolean));
-    setStats({
-      total: list.length,
-      approved: list.filter((m) => m.status === "approved").length,
-      pending: list.filter((m) => m.status === "pending").length,
-      rejected: list.filter((m) => m.status === "rejected").length,
-      hidden: list.filter((m) => m.status === "hidden").length,
-      universities: universities.size,
-    });
-  };
+  }, [getToken, computeStats, router]);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin_token");
+    const token = getToken();
     if (!token) {
       router.push("/admin/login");
       return;
     }
     fetchMemories();
-  }, [fetchMemories, router]);
+  }, [fetchMemories, getToken, router]);
 
-  const updateStatus = async (id: number, status: string) => {
+  const updateStatus = async (id: string, status: string) => {
+    const token = getToken();
+    if (!token) return;
+
     setActionLoading(id);
     try {
-      const headers = { ...getHeaders(), "Content-Type": "application/json" };
-      await fetch(`/api/admin/memories/${id}`, {
-        method: "PATCH",
-        headers,
+      const res = await fetch(`/api/memories/${id}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ status }),
       });
+
+      if (res.status === 401) {
+        localStorage.removeItem("admin_token");
+        router.push("/admin/login");
+        return;
+      }
+
+      if (!res.ok) throw new Error("Failed to update");
+
       setMemories((prev) => {
-        const updated = prev.map((m) => (m.id === id ? { ...m, status: status as Memory["status"] } : m));
+        const updated = prev.map((m) =>
+          m.id === id ? { ...m, status: status as Memory["status"] } : m
+        );
         computeStats(updated);
         return updated;
       });
@@ -106,33 +138,27 @@ export default function AdminPage() {
     }
   };
 
-  const toggleFavorite = async (id: number) => {
-    setActionLoading(id);
-    try {
-      const headers = { ...getHeaders(), "Content-Type": "application/json" };
-      const mem = memories.find((m) => m.id === id);
-      await fetch(`/api/admin/memories/${id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ is_favorite: !mem?.is_favorite }),
-      });
-      setMemories((prev) => {
-        const updated = prev.map((m) => (m.id === id ? { ...m, is_favorite: !m.is_favorite } : m));
-        computeStats(updated);
-        return updated;
-      });
-    } catch {
-      alert("حدث خطأ");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const deleteMemory = async (id: number) => {
+  const deleteMemory = async (id: string) => {
     if (!confirm("هل أنت متأكد من الحذف؟")) return;
+
+    const token = getToken();
+    if (!token) return;
+
     setActionLoading(id);
     try {
-      await fetch(`/api/admin/memories/${id}`, { method: "DELETE", headers: getHeaders() });
+      const res = await fetch(`/api/memories/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("admin_token");
+        router.push("/admin/login");
+        return;
+      }
+
+      if (!res.ok) throw new Error("Failed to delete");
+
       setMemories((prev) => {
         const updated = prev.filter((m) => m.id !== id);
         computeStats(updated);
@@ -145,315 +171,162 @@ export default function AdminPage() {
     }
   };
 
-  const exportCSV = () => {
-    const headers = ["الاسم", "الجامعة", "الرسالة", "الحالة", "التاريخ"];
-    const rows = filtered.map((m) => [
-      m.name,
-      m.university,
-      `"${m.message.replace(/"/g, '""')}"`,
-      STATUS_MAP[m.status]?.label || m.status,
-      new Date(m.created_at).toLocaleDateString("ar-EG"),
-    ]);
-    const csv = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "memories.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const logout = () => {
     localStorage.removeItem("admin_token");
     router.push("/admin/login");
   };
 
-  const filtered = memories.filter((m) => {
-    const matchStatus = statusFilter === "all" || m.status === statusFilter;
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q || m.name.toLowerCase().includes(q) || m.university.toLowerCase().includes(q) || m.message.toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
+  const filtered =
+    activeFilter === "all"
+      ? memories
+      : memories.filter((m) => m.status === activeFilter);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--cream, #FFF8ED)" }}>
-        <div className="text-xl" style={{ color: "var(--blue-dark, #123B5D)" }}>جاري التحميل...</div>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "#f8fafc", fontFamily: "Inter, Cairo, sans-serif" }}
+      >
+        <div className="spinner" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--cream, #FFF8ED)", direction: "rtl" }}>
-      {/* Header */}
-      <header className="sticky top-0 z-30 shadow-sm" style={{ background: "var(--blue-dark, #123B5D)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "#f8fafc", fontFamily: "Inter, Cairo, sans-serif", direction: "rtl" }}
+    >
+      <header
+        className="sticky top-0 z-30"
+        style={{ background: "#0f172a", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
+      >
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-white text-xl md:text-2xl font-bold">لوحة التحكم</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={exportCSV}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white transition hover:opacity-90"
-              style={{ background: "var(--orange-warm, #E9A23B)" }}
-            >
-              تصدير CSV
-            </button>
-            <button
-              onClick={logout}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition"
-            >
-              تسجيل الخروج
-            </button>
-          </div>
+          <button onClick={logout} className="btn btn-ghost btn-sm" style={{ color: "white" }}>
+            تسجيل الخروج
+          </button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { label: "الكل", value: stats.total, bg: "white" },
-              { label: "قيد المراجعة", value: stats.pending, bg: "#FEF3C7" },
-              { label: "مقبول", value: stats.approved, bg: "#D1FAE5" },
-              { label: "مرفوض", value: stats.rejected, bg: "#FEE2E2" },
-              { label: "الجامعات", value: stats.universities, bg: "#E0E7FF" },
+              { label: "الإجمالي", value: stats.total, bg: "#e2e8f0", color: "#0f172a" },
+              { label: "قيد المراجعة", value: stats.pending, bg: "#fef3c7", color: "#92400e" },
+              { label: "مقبول", value: stats.approved, bg: "#d1fae5", color: "#065f46" },
+              { label: "مرفوض", value: stats.rejected, bg: "#fee2e2", color: "#991b1b" },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl p-4 shadow-sm text-center" style={{ background: s.bg }}>
-                <div className="text-2xl font-bold" style={{ color: "var(--blue-dark, #123B5D)" }}>
-                  {s.value}
-                </div>
-                <div className="text-sm opacity-70" style={{ color: "var(--blue-dark, #123B5D)" }}>
-                  {s.label}
-                </div>
+              <div
+                key={s.label}
+                className="card p-4 text-center"
+                style={{ background: s.bg, color: s.color }}
+              >
+                <div className="text-2xl font-bold">{s.value}</div>
+                <div className="text-sm opacity-80">{s.label}</div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
-          <input
-            type="text"
-            placeholder="بحث بالاسم أو الجامعة أو الرسالة..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-4 py-2.5 rounded-xl border-2 text-sm focus:outline-none transition"
-            style={{ borderColor: "var(--blue-dark, #123B5D)", color: "var(--blue-dark, #123B5D)" }}
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border-2 text-sm focus:outline-none"
-            style={{ borderColor: "var(--blue-dark, #123B5D)", color: "var(--blue-dark, #123B5D)" }}
-          >
-            <option value="all">جميع الحالات</option>
-            <option value="pending">قيد المراجعة</option>
-            <option value="approved">مقبول</option>
-            <option value="rejected">مرفوض</option>
-            <option value="hidden">مخفي</option>
-          </select>
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveFilter(tab.key)}
+              className={`btn btn-sm whitespace-nowrap ${
+                activeFilter === tab.key ? "btn-primary" : "btn-outline"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Empty */}
-        {filtered.length === 0 && (
-          <div className="text-center py-20 text-xl opacity-60" style={{ color: "var(--blue-dark, #123B5D)" }}>
-            لسه مفيش رسائل
+        {filtered.length === 0 ? (
+          <div className="card p-12 text-center" style={{ color: "#64748b" }}>
+            لا توجد ذكريات حالياً
           </div>
-        )}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((m) => {
+              const statusInfo = STATUS_MAP[m.status] || STATUS_MAP.pending;
+              return (
+                <div key={m.id} className="card card-hover p-4">
+                  {m.image_url && (
+                    <img
+                      src={m.image_url}
+                      alt={m.name}
+                      className="w-full h-48 object-cover rounded-lg mb-3"
+                    />
+                  )}
 
-        {/* Table */}
-        {filtered.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead style={{ background: "var(--blue-dark, #123B5D)" }}>
-                  <tr>
-                    <th className="px-4 py-3 text-right text-white font-medium">الصورة</th>
-                    <th className="px-4 py-3 text-right text-white font-medium">الاسم</th>
-                    <th className="px-4 py-3 text-right text-white font-medium">الجامعة</th>
-                    <th className="px-4 py-3 text-right text-white font-medium">الرسالة</th>
-                    <th className="px-4 py-3 text-right text-white font-medium">الحالة</th>
-                    <th className="px-4 py-3 text-right text-white font-medium">التاريخ</th>
-                    <th className="px-4 py-3 text-center text-white font-medium">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((m) => (
-                    <tr key={m.id} className="border-t border-gray-100 hover:bg-gray-50 transition">
-                      <td className="px-4 py-3">
-                        {m.image_url && (
-                          <img
-                            src={m.image_url}
-                            alt={m.name}
-                            className="w-12 h-12 rounded-lg object-cover cursor-pointer hover:opacity-80"
-                            onClick={() => setPreviewImage(m.image_url)}
-                          />
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-medium" style={{ color: "var(--blue-dark, #123B5D)" }}>
-                        {m.name}
-                        {m.is_favorite && <span className="mr-1 text-xs">⭐</span>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{m.university}</td>
-                      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{m.message}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_MAP[m.status]?.color}`}>
-                          {STATUS_MAP[m.status]?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                        {new Date(m.created_at).toLocaleDateString("ar-EG")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                          {m.status !== "approved" && (
-                            <button
-                              onClick={() => updateStatus(m.id, "approved")}
-                              disabled={actionLoading === m.id}
-                              className="px-2 py-1 rounded text-xs bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
-                            >
-                              قبول
-                            </button>
-                          )}
-                          {m.status !== "rejected" && (
-                            <button
-                              onClick={() => updateStatus(m.id, "rejected")}
-                              disabled={actionLoading === m.id}
-                              className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
-                            >
-                              رفض
-                            </button>
-                          )}
-                          {m.status !== "hidden" && (
-                            <button
-                              onClick={() => updateStatus(m.id, "hidden")}
-                              disabled={actionLoading === m.id}
-                              className="px-2 py-1 rounded text-xs bg-gray-400 text-white hover:bg-gray-500 disabled:opacity-50"
-                            >
-                              إخفاء
-                            </button>
-                          )}
-                          <button
-                            onClick={() => toggleFavorite(m.id)}
-                            disabled={actionLoading === m.id}
-                            className="px-2 py-1 rounded text-xs hover:opacity-80 disabled:opacity-50"
-                            style={{ background: m.is_favorite ? "#FEF3C7" : "#F3F4F6" }}
-                          >
-                            {m.is_favorite ? "⭐" : "☆"}
-                          </button>
-                          <button
-                            onClick={() => deleteMemory(m.id)}
-                            disabled={actionLoading === m.id}
-                            className="px-2 py-1 rounded text-xs bg-gray-700 text-white hover:bg-black disabled:opacity-50"
-                          >
-                            حذف
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile cards */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filtered.map((m) => (
-                <div key={m.id} className="p-4">
-                  <div className="flex gap-3">
-                    {m.image_url && (
-                      <img
-                        src={m.image_url}
-                        alt={m.name}
-                        className="w-14 h-14 rounded-lg object-cover cursor-pointer flex-shrink-0"
-                        onClick={() => setPreviewImage(m.image_url)}
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate" style={{ color: "var(--blue-dark, #123B5D)" }}>
-                          {m.name}
-                        </span>
-                        {m.is_favorite && <span className="text-xs">⭐</span>}
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_MAP[m.status]?.color}`}>
-                          {STATUS_MAP[m.status]?.label}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">{m.university}</div>
-                      <div className="text-sm text-gray-600 mt-1 line-clamp-2">{m.message}</div>
-                    </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-base" style={{ color: "#0f172a" }}>
+                      {m.name}
+                    </h3>
+                    <span
+                      className="text-xs px-2.5 py-1 rounded-full font-medium"
+                      style={{ background: statusInfo.bg, color: statusInfo.text }}
+                    >
+                      {statusInfo.label}
+                    </span>
                   </div>
-                  <div className="flex gap-1.5 mt-3 justify-end">
+
+                  <p className="text-sm mb-2" style={{ color: "#475569", lineHeight: "1.6" }}>
+                    {m.message}
+                  </p>
+
+                  {m.nice_moment && (
+                    <p
+                      className="text-xs mb-2 p-2 rounded-lg"
+                      style={{ background: "#f1f5f9", color: "#64748b" }}
+                    >
+                      {m.nice_moment}
+                    </p>
+                  )}
+
+                  <div className="text-xs mb-3" style={{ color: "#94a3b8" }}>
+                    {new Date(m.created_at).toLocaleDateString("ar-EG")}
+                  </div>
+
+                  <div className="flex gap-2">
                     {m.status !== "approved" && (
                       <button
                         onClick={() => updateStatus(m.id, "approved")}
                         disabled={actionLoading === m.id}
-                        className="px-2.5 py-1 rounded text-xs bg-green-500 text-white"
+                        className="btn btn-sm flex-1"
+                        style={{ background: "#22c55e", color: "white" }}
                       >
-                        قبول
+                        {actionLoading === m.id ? "..." : "قبول"}
                       </button>
                     )}
                     {m.status !== "rejected" && (
                       <button
                         onClick={() => updateStatus(m.id, "rejected")}
                         disabled={actionLoading === m.id}
-                        className="px-2.5 py-1 rounded text-xs bg-red-500 text-white"
+                        className="btn btn-sm flex-1"
+                        style={{ background: "#ef4444", color: "white" }}
                       >
-                        رفض
+                        {actionLoading === m.id ? "..." : "رفض"}
                       </button>
                     )}
-                    {m.status !== "hidden" && (
-                      <button
-                        onClick={() => updateStatus(m.id, "hidden")}
-                        disabled={actionLoading === m.id}
-                        className="px-2.5 py-1 rounded text-xs bg-gray-400 text-white"
-                      >
-                        إخفاء
-                      </button>
-                    )}
-                    <button
-                      onClick={() => toggleFavorite(m.id)}
-                      disabled={actionLoading === m.id}
-                      className="px-2.5 py-1 rounded text-xs"
-                      style={{ background: m.is_favorite ? "#FEF3C7" : "#F3F4F6" }}
-                    >
-                      {m.is_favorite ? "⭐" : "☆"}
-                    </button>
                     <button
                       onClick={() => deleteMemory(m.id)}
                       disabled={actionLoading === m.id}
-                      className="px-2.5 py-1 rounded text-xs bg-gray-700 text-white"
+                      className="btn btn-sm btn-outline"
+                      style={{ color: "#ef4444", borderColor: "#ef4444" }}
                     >
-                      حذف
+                      {actionLoading === m.id ? "..." : "حذف"}
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </main>
-
-      {/* Image Preview Modal */}
-      {previewImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setPreviewImage(null)}
-        >
-          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage} alt="معاينة" className="w-full rounded-2xl shadow-2xl" />
-            <button
-              onClick={() => setPreviewImage(null)}
-              className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-white text-gray-700 shadow-lg flex items-center justify-center text-lg hover:bg-gray-100"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -188,7 +188,17 @@ export default function WritePage() {
             </div>
           )}
 
-          <button type="submit" disabled={submitting || !nameOk || !msgOk} className="btn btn-primary btn-lg w-full disabled:opacity-40 disabled:cursor-not-allowed">
+          <button
+            type="submit"
+            disabled={submitting || !nameOk || !msgOk}
+            className="btn btn-lg w-full transition-all duration-300"
+            style={{
+              background: (nameOk && msgOk) ? "var(--navy)" : "var(--slate-200)",
+              color: (nameOk && msgOk) ? "white" : "var(--slate-400)",
+              cursor: (submitting || !nameOk || !msgOk) ? "not-allowed" : "pointer",
+              boxShadow: (nameOk && msgOk) ? "0 4px 12px rgba(30,41,59,0.2)" : "none",
+            }}
+          >
             {submitting ? <><div className="spinner" /> جاري الإرسال...</> : "سيب كلمتك في الدفتر ❤️"}
           </button>
 

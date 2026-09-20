@@ -35,9 +35,7 @@ export async function GET(request: NextRequest) {
     const pending = memories?.filter((m) => m.status === "pending").length || 0;
     const rejected = memories?.filter((m) => m.status === "rejected").length || 0;
     const hidden = memories?.filter((m) => m.status === "hidden").length || 0;
-    const universities = new Set(
-      memories?.filter((m) => m.university).map((m) => m.university)
-    ).size;
+    const universities = 0;
 
     return NextResponse.json({
       memories,
