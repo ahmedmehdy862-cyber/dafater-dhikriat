@@ -1,290 +1,256 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { MemoryCard, type MemoryCardData, type MemoryVariant } from "@/components/memory-card";
 
-interface Memory {
-  id: string;
-  name: string;
-  message: string;
-  nice_moment: string | null;
-  image_url: string | null;
-  created_at: string;
-  show_name: boolean;
-  show_nice_moment: boolean;
-  show_image: boolean;
-  is_public: boolean;
-  is_favorite: boolean;
+const COLORS = ["#1e293b", "#3b82f6", "#059669", "#7c3aed", "#dc2626", "#d97706", "#0891b2", "#c026d3"];
+
+const hash = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  return Math.abs(h);
+};
+
+const colorFor = (name: string) => COLORS[hash(name) % COLORS.length];
+
+const fmtDate = (d: string) => {
+  try {
+    return new Date(d).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+  } catch {
+    return "";
+  }
+};
+
+function variantFor(m: MemoryCardData): MemoryVariant {
+  const kinds: MemoryVariant[] = ["quote", "text", "polaroid", "image"];
+  let k = kinds[hash(m.id) % kinds.length];
+  const hasImg = !!m.image_url && m.show_image !== false;
+  if ((k === "polaroid" || k === "image") && !hasImg) k = "text";
+  return k;
 }
 
-const fmt = (d: string) => new Date(d).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
-const fmtShort = (d: string) => new Date(d).toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
-
 export default function MemoriesPage() {
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [memories, setMemories] = useState<MemoryCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [current, setCurrent] = useState(0);
-  const [flipping, setFlipping] = useState<"next" | "prev" | null>(null);
-  const [showCover, setShowCover] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<MemoryCardData | null>(null);
 
-  const fetchM = useCallback(async () => {
-    setLoading(true);
+  const loadMemories = useCallback(async (showSpinner?: boolean) => {
+    if (showSpinner) setLoading(true);
     try {
       const r = await fetch("/api/memories?limit=100");
-      if (!r.ok) throw new Error("فشل التحميل");
+      if (!r.ok) throw new Error("fail");
       const d = await r.json();
       setMemories(d.memories || []);
     } catch {
-      setError("حصل مشكلة، حاول تاني");
+      setError("حصلت مشكلة، حاول تاني");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchM();
-  }, [fetchM]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/memories?limit=100");
+        if (!r.ok) throw new Error("fail");
+        const d = await r.json();
+        if (!cancelled) setMemories(d.memories || []);
+      } catch {
+        if (!cancelled) setError("حصلت مشكلة، حاول تاني");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (showCover) {
-        if (e.key === "Enter" || e.key === " ") openNotebook();
-        return;
-      }
-      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        if (flipping) return;
-        if (e.key === "ArrowRight" && current > 0) goPrev();
-        if (e.key === "ArrowLeft" && current < memories.length - 1) goNext();
-      }
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  });
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [selected]);
 
-  const openNotebook = () => {
-    setShowCover(false);
-    setCurrent(0);
-  };
+  const filtered = useMemo(() => {
+    const q = search.trim();
+    if (!q) return memories;
+    return memories.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.message.toLowerCase().includes(q) ||
+        (m.nice_moment || "").toLowerCase().includes(q)
+    );
+  }, [memories, search]);
 
-  const goNext = () => {
-    if (current >= memories.length - 1 || flipping) return;
-    setFlipping("next");
-    setTimeout(() => {
-      setCurrent((p) => p + 1);
-      setFlipping(null);
-    }, 500);
-  };
+  const stats = useMemo(() => {
+    const people = new Set(memories.map((m) => m.name.trim()).filter(Boolean)).size;
+    const last = memories.length ? memories[0].created_at : null;
+    return { total: memories.length, people, last };
+  }, [memories]);
 
-  const goPrev = () => {
-    if (current <= 0 || flipping) return;
-    setFlipping("prev");
-    setTimeout(() => {
-      setCurrent((p) => p - 1);
-      setFlipping(null);
-    }, 500);
-  };
+  function openRandom(scope: MemoryCardData[] = filtered) {
+    if (!scope.length) return;
+    setSelected(scope[Math.floor(Math.random() * scope.length)]);
+  }
 
   if (loading) {
     return (
-      <div className="notebook-bg flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <div className="book-loader" />
-          <p style={{ color: "#8b7355", fontFamily: "Georgia, serif" }}>جاري فتح الدفتر...</p>
-        </div>
-      </div>
+      <main className="mem-page mem-center">
+        <div className="book-loader" />
+        <p className="mem-loading-text">جاري فتح الدفتر...</p>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="notebook-bg flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-lg mb-4" style={{ color: "#8b7355" }}>{error}</p>
-          <button onClick={fetchM} className="btn btn-outline">حاول تاني</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (memories.length === 0) {
-    return (
-      <div className="notebook-bg flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-6xl mb-4">📖</div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: "#5c4a3a", fontFamily: "Georgia, serif" }}>
-            الدفتر فاضي
-          </h2>
-          <p className="text-sm mb-6" style={{ color: "#8b7355" }}>كن أول من يكتب ذكرى في هذا الدفتر</p>
-          <Link href="/write" className="btn btn-primary btn-lg">اكتب ذكرتك</Link>
-        </div>
-      </div>
+      <main className="mem-page mem-center">
+        <p className="wiz-error">{error}</p>
+        <button onClick={() => loadMemories(true)} className="btn btn-outline">حاول تاني</button>
+      </main>
     );
   }
 
   return (
-    <div className="notebook-bg min-h-screen overflow-hidden">
-      {showCover ? (
-        <div className="cover-container">
-          <div className="cover">
-            <div className="cover-decoration cover-decoration-1" />
-            <div className="cover-decoration cover-decoration-2" />
-            <div className="cover-binding" />
-
-            <div className="cover-content">
-              <div className="cover-ornament">&#10053;</div>
-              <h1 className="cover-title">دفتر الذكريات</h1>
-              <div className="cover-line" />
-              <p className="cover-subtitle">
-                {memories.length === 1
-                  ? "ذكرى واحدة جميلة"
-                  : `${memories.length} ذكرى جميلة`}
-              </p>
-              <div className="cover-ornament">&#10053;</div>
-
-              <button onClick={openNotebook} className="btn btn-lg cover-btn">
-                افتح الدفتر
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
-                </svg>
-              </button>
-            </div>
-          </div>
+    <main className="mem-page">
+      <header className="mem-nav">
+        <div className="mem-nav-inner">
+          <Link href="/" className="wiz-nav-link">
+            <svg className="rtl-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+            الرئيسية
+          </Link>
+          <Link href="/write" className="btn btn-primary btn-sm">اكتب ذكريتك &#129525;</Link>
         </div>
-      ) : (
-        <>
-          {/* Top nav */}
-          <div className="sticky top-0 z-40 notebook-nav">
-            <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-              <Link href="/" className="btn btn-ghost btn-sm" style={{ color: "#5c4a3a" }}>
-                <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-                الرئيسية
-              </Link>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowCover(true)}
-                  className="btn btn-ghost btn-sm"
-                  style={{ color: "#5c4a3a" }}
-                >
-                  📖 الغلاف
-                </button>
-                <Link href="/write" className="btn btn-primary btn-sm">✏️ اكتب</Link>
-              </div>
-            </div>
+      </header>
+
+      <section className="mem-hero">
+        <span className="mem-eyebrow">دفتر الذكريات</span>
+        <h1 className="mem-title">
+          كل كلمة هنا...
+          <br />
+          جزء من الحكاية.
+        </h1>
+        {memories.length > 0 && (
+          <div className="mem-stats">
+            <span className="mem-stat-chip">
+              <b>{stats.total}</b> ذكرى
+            </span>
+            <span className="mem-stat-chip">
+              <b>{stats.people}</b> مساهم
+            </span>
+            {stats.last && (
+              <span className="mem-stat-chip mem-stat-last">آخر ذكرى: {fmtDate(stats.last)}</span>
+            )}
           </div>
+        )}
 
-          {/* Book area */}
-          <div className="book-area">
-            {/* Page shadow */}
-            <div className="book-shadow" />
+        <div className="mem-actions">
+          <button
+            onClick={() => openRandom()}
+            disabled={!filtered.length}
+            className="btn btn-amber btn-lg mem-random"
+          >
+            افتح ذكرى عشوائية 🎲
+          </button>
+          <label className="mem-search">
+            <svg className="mem-search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث في الذكريات..."
+              className="mem-search-input"
+            />
+          </label>
+        </div>
+      </section>
 
-            {/* The notebook */}
-            <div className="notebook">
-              <div className="notebook-spine" />
+      {memories.length === 0 ? (
+        <section className="mem-empty">
+          <div className="mem-empty-paper">&#127873;</div>
+          <h2 className="mem-empty-title">لسه أول صفحة في الدفتر فاضية...</h2>
+          <p className="mem-empty-sub">يمكن تكون أنت أول حد يسيب فيها ذكرى.</p>
+          <Link href="/write" className="btn btn-primary btn-lg">اكتب أول ذكرى</Link>
+        </section>
+      ) : filtered.length === 0 ? (
+        <section className="mem-empty">
+          <p className="mem-empty-sub">مفيش نتائج تنطبق على بحثك.</p>
+          <button onClick={() => setSearch("")} className="btn btn-outline">امسح البحث</button>
+        </section>
+      ) : (
+        <section className="mem-grid">
+          {filtered.map((m) => (
+            <MemoryCard
+              key={m.id}
+              m={m}
+              variant={variantFor(m)}
+              onOpen={() => setSelected(m)}
+            />
+          ))}
+        </section>
+      )}
 
-              {/* Previous page (visible behind) */}
-              <div className={`page page-back ${flipping === "next" ? "flip-out" : ""}`}>
-                {current > 0 && (
-                  <div className="page-content" key={`prev-${current}`}>
-                    <PageContent m={memories[current - 1]} />
+      {selected && (
+        <div className="mem-modal" role="dialog" aria-modal="true" onClick={() => setSelected(null)}>
+          <div className="mem-modal-backdrop" />
+          <div className="mem-dialog" onClick={(e) => e.stopPropagation()}>
+            <button className="mem-close" onClick={() => setSelected(null)} aria-label="إغلاق">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="mem-dialog-scroll">
+              {selected.image_url && selected.show_image !== false && (
+                <img src={selected.image_url} alt={selected.show_name ? `صورة من ${selected.name}` : "صورة من الذكرى"} className="mem-dialog-img" />
+              )}
+
+              <div className="mem-dialog-body">
+                <div className="mem-dialog-quote">&rdquo;</div>
+                <p className="mem-dialog-message">{selected.message}</p>
+
+                {selected.nice_moment && selected.show_nice_moment !== false && (
+                  <div className="m-card-moment">
+                    <span className="m-moment-tag">&#10024; موقف حلو</span>
+                    <p>{selected.nice_moment}</p>
                   </div>
                 )}
-              </div>
 
-              {/* Current page */}
-              <div className={`page page-front ${flipping === "next" ? "flip-in-next" : flipping === "prev" ? "flip-in-prev" : ""}`}>
-                <div className="page-content" key={`curr-${current}`}>
-                  <div className="page-header">
-                    <span className="page-number">{current + 1} / {memories.length}</span>
-                    <span className="page-date">{fmt(memories[current].created_at)}</span>
-                  </div>
-                  <PageContent m={memories[current]} />
+                <div className="mem-dialog-footer">
+                  {selected.show_name && selected.name && (
+                    <span className="mem-dialog-name" style={{ color: colorFor(selected.name) || undefined }}>
+                      — {selected.name}
+                    </span>
+                  )}
+                  <span className="mem-dialog-date">{fmtDate(selected.created_at)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Navigation */}
-            <div className="nav-buttons">
-              <button
-                onClick={goPrev}
-                disabled={current <= 0 || !!flipping}
-                className="nav-btn"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
-
-              <div className="page-dots">
-                {memories.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      if (flipping || i === current) return;
-                      setFlipping(i > current ? "next" : "prev");
-                      setTimeout(() => {
-                        setCurrent(i);
-                        setFlipping(null);
-                      }, 500);
-                    }}
-                    className={`page-dot ${i === current ? "active" : ""}`}
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={goNext}
-                disabled={current >= memories.length - 1 || !!flipping}
-                className="nav-btn"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
+            <div className="mem-dialog-actions">
+              <button onClick={() => openRandom()} className="btn btn-amber btn-sm">ذكرى تانية 🎲</button>
+              <Link href="/write" className="btn btn-primary btn-sm">سيب ذكريتك 🤍</Link>
             </div>
-
-            {/* Page corners */}
-            <div className="page-corner page-corner-right" onClick={goNext} />
           </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function PageContent({ m }: { m: Memory }) {
-  return (
-    <div className="page-text">
-      {m.show_name && (
-        <p className="page-author" style={{ fontFamily: "Georgia, serif" }}>
-          ~ {m.name} ~
-        </p>
-      )}
-
-      <div className="page-quote">&ldquo;</div>
-
-      <p className="page-message">{m.message}</p>
-
-      {m.nice_moment && m.show_nice_moment && (
-        <div className="page-moment">
-          <p className="page-moment-label">&#10024; موقف حلو</p>
-          <p className="page-moment-text">{m.nice_moment}</p>
         </div>
       )}
-
-      {m.image_url && m.show_image && (
-        <img
-          src={m.image_url}
-          alt=""
-          className="page-image"
-        />
-      )}
-
-      <div className="page-footer">
-        <span className="page-line" />
-      </div>
-    </div>
+    </main>
   );
 }

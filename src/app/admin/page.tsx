@@ -77,44 +77,37 @@ export default function AdminPage() {
     return localStorage.getItem("admin_token");
   }, []);
 
-  const fetchMemories = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      router.push("/admin/login");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/admin/memories", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        localStorage.removeItem("admin_token");
-        router.push("/admin/login");
-        return;
-      }
-
-      if (!res.ok) throw new Error("Failed to fetch");
-
-      const data = await res.json();
-      const list: Memory[] = Array.isArray(data) ? data : data.memories || [];
-      setMemories(list);
-    } catch {
-      router.push("/admin/login");
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken, router]);
-
   useEffect(() => {
     const token = getToken();
     if (!token) {
       router.push("/admin/login");
       return;
     }
-    fetchMemories();
-  }, [fetchMemories, getToken, router]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/memories", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) {
+          localStorage.removeItem("admin_token");
+          router.push("/admin/login");
+          return;
+        }
+        if (!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        const list: Memory[] = Array.isArray(data) ? data : data.memories || [];
+        if (!cancelled) setMemories(list);
+      } catch {
+        router.push("/admin/login");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, router]);
 
   const updateStatus = async (id: string, status: string) => {
     const token = getToken();

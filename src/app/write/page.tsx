@@ -1,71 +1,228 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { MemoryCard, type MemoryCardData } from "@/components/memory-card";
 
 const MIN = 30;
+const DRAFT_KEY = "dafater_draft_v1";
+
+type Step = "welcome" | "name" | "message" | "moment" | "image" | "preview";
+
+const STEPS: { key: Step; label: string }[] = [
+  { key: "name", label: "الاسم" },
+  { key: "message", label: "الذكرى" },
+  { key: "moment", label: "الموقف" },
+  { key: "image", label: "الصورة" },
+];
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("load-error"));
+    };
+    img.src = url;
+  });
+}
+
+function fileToDataURL(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(f);
+  });
+}
+
+async function dataUrlToFile(dataUrl: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], `memory-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
+}
+
+async function compressImage(f: File): Promise<File> {
+  if (f.type === "image/gif" || f.size <= 400 * 1024) return f;
+  const img = await loadImage(f);
+  const MAX = 1280;
+  let { width, height } = img;
+  if (width > MAX || height > MAX) {
+    const r = Math.min(MAX / width, MAX / height);
+    width = Math.round(width * r);
+    height = Math.round(height * r);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return f;
+  ctx.drawImage(img, 0, 0, width, height);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.86));
+  if (!blob) return f;
+  return new File([blob], f.name.replace(/\.[^.]+$/i, "") + ".jpg", { type: "image/jpeg" });
+}
 
 export default function WritePage() {
   const router = useRouter();
+  const [step, setStep] = useState<Step>("welcome");
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
-  const [niceMoment, setNiceMoment] = useState("");
+  const [moment, setMoment] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [draftFound, setDraftFound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [imgError, setImgError] = useState("");
+  const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const msgRef = useRef<HTMLTextAreaElement>(null);
 
   const nameOk = name.trim().length >= 2;
   const msgOk = message.trim().length >= MIN;
 
-  function onImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
-      setErrors((p) => ({ ...p, image: "الصورة لازم تكون JPG أو PNG أو WebP" }));
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d && (d.name?.trim() || d.message?.trim() || d.moment?.trim())) {
+          setDraftFound(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (step === "welcome") return;
+    try {
+      const img = imagePreview && imagePreview.length < 2_500_000 ? imagePreview : null;
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ name, message, moment, isPublic, image: img })
+      );
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [name, message, moment, isPublic, imagePreview, step]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (step === "name") nameRef.current?.focus();
+      if (step === "message") msgRef.current?.focus();
+    }, 120);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  function resumeDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+      setName(d.name || "");
+      setMessage(d.message || "");
+      setMoment(d.moment || "");
+      setIsPublic(d.isPublic !== false);
+      if (d.image) setImagePreview(d.image);
+      setDraftFound(false);
+      setStep(d.message?.trim() ? "message" : "name");
+    } catch {
+      setDraftFound(false);
+      setStep("name");
+    }
+  }
+
+  function startFresh() {
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftFound(false);
+    setName("");
+    setMessage("");
+    setMoment("");
+    setImageFile(null);
+    setImagePreview(null);
+    setIsPublic(true);
+    setStep("name");
+  }
+
+  async function handleFile(f: File) {
+    setImgError("");
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(f.type)) {
+      setImgError("الصورة لازم تكون JPG أو PNG أو WebP");
       return;
     }
     if (f.size > 5 * 1024 * 1024) {
-      setErrors((p) => ({ ...p, image: "الحجم الأقصى 5 ميجا" }));
+      setImgError("الحجم الأقصى للصورة 5 ميجا");
       return;
     }
-    setErrors((p) => { const n = { ...p }; delete n.image; return n; });
-    setImageFile(f);
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(f);
+    try {
+      const compressed = await compressImage(f);
+      const preview = await fileToDataURL(compressed);
+      setImageFile(compressed);
+      setImagePreview(preview);
+    } catch {
+      setImgError("حصلت مشكلة في قراءة الصورة");
+    }
+  }
+
+  function onImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    handleFile(f);
   }
 
   function removeImage() {
     setImageFile(null);
     setImagePreview(null);
+    setImgError("");
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function validate() {
-    const e: Record<string, string> = {};
-    if (!name.trim() || name.trim().length < 2) e.name = "الاسم لازم يكون حرفين على الأقل";
-    if (!message.trim() || message.trim().length < MIN) e.message = `الرسالة لازم يكون فيها ${MIN} حرف على الأقل`;
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  function nextFromName() {
+    if (!nameOk) return;
+    setSubmitError("");
+    setStep("message");
   }
 
-  async function onSubmit(ev: React.FormEvent) {
-    ev.preventDefault();
+  function nextFromMessage() {
+    if (!msgOk) return;
     setSubmitError("");
-    if (!validate()) return;
+    setStep("moment");
+  }
+
+  function nextFromMoment() {
+    setSubmitError("");
+    setStep("image");
+  }
+
+  function nextFromImage() {
+    setSubmitError("");
+    setStep("preview");
+  }
+
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitError("");
     setSubmitting(true);
     try {
       let imageUrl = "";
-      if (imageFile) {
+      let payloadFile = imageFile;
+      if (!payloadFile && imagePreview) payloadFile = await dataUrlToFile(imagePreview);
+      if (payloadFile) {
         const fd = new FormData();
-        fd.append("file", imageFile);
+        fd.append("file", payloadFile);
         const ur = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!ur.ok) throw new Error("فشل رفع الصورة");
+        if (!ur.ok) throw new Error("upload-failed");
         imageUrl = (await ur.json()).url;
       }
       const res = await fetch("/api/memories", {
@@ -74,136 +231,298 @@ export default function WritePage() {
         body: JSON.stringify({
           name: name.trim(),
           message: message.trim(),
-          nice_moment: niceMoment.trim() || undefined,
+          nice_moment: moment.trim() || undefined,
           image_url: imageUrl || undefined,
           is_public: isPublic,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || "فشل الإرسال");
+      if (!res.ok) throw new Error("submit-failed");
+      localStorage.removeItem(DRAFT_KEY);
       router.push("/success");
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "حصل مشكلة، حاول تاني");
-    } finally {
+    } catch {
+      setSubmitError("حصلت مشكلة بسيطة أثناء حفظ الذكرى. جرّب مرة تانية، واللي كتبته لسه موجود.");
       setSubmitting(false);
     }
   }
 
+  const previewMemory: MemoryCardData = {
+    id: "preview",
+    name,
+    message,
+    nice_moment: moment.trim() || null,
+    image_url: imagePreview || null,
+    created_at: new Date().toISOString(),
+    show_name: true,
+    show_nice_moment: true,
+    show_image: true,
+  };
+
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
+
   return (
-    <main className="min-h-screen bg-[var(--slate-50)]">
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-[var(--slate-200)]">
-        <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="btn btn-ghost btn-sm">
-            <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+    <main className="wiz-page">
+      <header className="wiz-nav">
+        <div className="wiz-nav-inner">
+          <Link href="/" className="wiz-nav-link">
+            <svg className="rtl-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
             الرئيسية
           </Link>
-          <span className="text-sm font-semibold" style={{ color: "var(--slate-500)" }}>كلمة جديدة</span>
+          <Link href="/memories" className="wiz-nav-link">مشاهدة الذكريات &#128317;</Link>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-2 mb-8 px-2">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex-1">
-              <div className="h-1.5 rounded-full transition-all duration-500" style={{
-                background: (s === 1 && nameOk) || (s === 2 && msgOk)
-                  ? "var(--blue)" : "var(--slate-200)"
-              }} />
-            </div>
-          ))}
-        </div>
+      <div className="wiz-wrap">
+        {step === "welcome" && (
+          <div className="wiz-card wiz-center anim-wiz-in" key="welcome">
+            <div className="wiz-heart">&#128158;</div>
+            <h1 className="wiz-title">عندك ذكرى حابب تسيبها؟</h1>
+            <p className="wiz-sub">
+              يمكن تكون كلمة صغيرة...<br />
+              لكنها بالنسبة لحد تاني هتفضل ذكرى كبيرة.
+            </p>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          {/* Name */}
-          <div className="card p-5">
-            <label htmlFor="name" className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-bold" style={{ color: "var(--slate-800)" }}>اسمك</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--amber-light)", color: "var(--amber-dark)" }}>مطلوب</span>
-            </label>
-            <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="اكتب اسمك..." className="input" autoFocus />
-            {errors.name && <p className="mt-2 text-xs font-medium" style={{ color: "var(--red)" }}>{errors.name}</p>}
+            {draftFound && (
+              <div className="wiz-draft">
+                <p className="wiz-draft-title">لقيّنا ذكرى بدأت تكتبها...</p>
+                <p className="wiz-draft-sub">تحب تكملها؟</p>
+                <div className="wiz-draft-actions">
+                  <button onClick={resumeDraft} className="btn btn-primary">كمّل الكتابة</button>
+                  <button onClick={startFresh} className="btn btn-outline">ابدأ من جديد</button>
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => setStep("name")} className="btn btn-primary btn-lg wiz-cta">
+              ابدأ كتابة الذكرى
+            </button>
           </div>
+        )}
 
-          {/* Message */}
-          <div className="card p-5">
-            <label htmlFor="message" className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-bold" style={{ color: "var(--slate-800)" }}>رسالتك</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--amber-light)", color: "var(--amber-dark)" }}>مطلوب</span>
-            </label>
-            <textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="اكتب اللي تحب تقوله..." rows={4} className="input resize-none" />
-            <div className="flex justify-between items-center mt-2">
-              {errors.message ? <p className="text-xs font-medium" style={{ color: "var(--red)" }}>{errors.message}</p> : <span />}
-              <span className="text-xs" style={{ color: message.length >= MIN ? "var(--green)" : "var(--slate-400)" }}>
-                {message.length} حرف {message.length < MIN && `(محتاج ${MIN - message.length} تاني)`}
+        {step !== "welcome" && (
+          <div className="wiz-progress" aria-hidden>
+            {STEPS.map((s, i) => (
+              <div key={s.key} className={`wiz-prog-seg ${i <= stepIndex ? "done" : ""}`} />
+            ))}
+          </div>
+        )}
+
+        {/* Step: name */}
+        {step === "name" && (
+          <div className="wiz-card anim-wiz-in" key="name">
+            <p className="wiz-step-label">الخطوة ١ من ٤</p>
+            <label htmlFor="wiz-name" className="wiz-label">نبدأ باسمك؟</label>
+            <input
+              id="wiz-name"
+              ref={nameRef}
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="اكتب اسمك"
+              className="input wiz-input"
+              autoComplete="name"
+            />
+            <p className="wiz-helper">الاسم اللي تحب يظهر مع ذكريتك.</p>
+            {!nameOk && name.length > 0 && (
+              <p className="wiz-error">الاسم لازم يكون حرفين على الأقل</p>
+            )}
+            <div className="wiz-btn-row">
+              <button onClick={() => setStep("welcome")} className="btn btn-ghost">رجوع</button>
+              <button
+                onClick={nextFromName}
+                disabled={!nameOk}
+                className={`btn btn-primary ${nameOk ? "" : "wiz-disabled"}`}
+              >
+                التالي
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step: message */}
+        {step === "message" && (
+          <div className="wiz-card anim-wiz-in" key="message">
+            <p className="wiz-step-label">الخطوة ٢ من ٤</p>
+            <label htmlFor="wiz-msg" className="wiz-label">إيه الذكرى اللي حابب تسيبها؟</label>
+            <textarea
+              id="wiz-msg"
+              ref={msgRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={"اكتب براحتك...\nموقف، كلمة، شخص، أو حتى حاجة صغيرة عمرك ما نسيتها."}
+              rows={7}
+              className="input wiz-textarea"
+            />
+            <div className="wiz-counter-row">
+              <span className={`wiz-counter ${msgOk ? "ok" : ""}`}>
+                {message.length} حرف{!msgOk && ` — محتاج ${MIN - message.length} تاني`}
               </span>
             </div>
-          </div>
-
-          {/* Options */}
-          <div className="card p-5">
-            <p className="text-sm font-bold mb-4" style={{ color: "var(--slate-500)" }}>اختيارات إضافية</p>
-
-            {/* Nice Moment */}
-            <div className="mb-4">
-              <label htmlFor="niceMoment" className="block text-sm font-medium mb-1.5" style={{ color: "var(--slate-700)" }}>موقف حلو حصل</label>
-              <textarea id="niceMoment" value={niceMoment} onChange={(e) => setNiceMoment(e.target.value)} placeholder="اكتب موقف حلو افتكره..." rows={3} className="input resize-none" />
+            <div className="wiz-btn-row">
+              <button onClick={() => setStep("name")} className="btn btn-ghost">رجوع</button>
+              <button
+                onClick={nextFromMessage}
+                disabled={!msgOk}
+                className={`btn btn-primary ${msgOk ? "" : "wiz-disabled"}`}
+              >
+                التالي
+              </button>
             </div>
+          </div>
+        )}
 
-            {/* Image */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--slate-700)" }}>صورة تجمعنا</label>
-              {imagePreview ? (
-                <div className="relative inline-block">
-                  <img src={imagePreview} alt="" className="w-24 h-24 object-cover rounded-lg border border-[var(--slate-200)]" />
-                  <button type="button" onClick={removeImage} className="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs text-white bg-[var(--red)]" aria-label="حذف">✕</button>
-                </div>
+        {/* Step: moment */}
+        {step === "moment" && (
+          <div className="wiz-card anim-wiz-in" key="moment">
+            <p className="wiz-step-label">الخطوة ٣ من ٤ — اختياري</p>
+            <label htmlFor="wiz-moment" className="wiz-label">معاك موقف حلو حابب تحكيه؟</label>
+            <textarea
+              id="wiz-moment"
+              value={moment}
+              onChange={(e) => setMoment(e.target.value)}
+              placeholder="موقف صغير حصل وكنت حابب يكون محفوظ..."
+              rows={4}
+              className="input wiz-textarea"
+            />
+            <p className="wiz-helper">حاجة اختيارية خالص — لو مش فاكر حاجة عادي جدًا.</p>
+            <div className="wiz-btn-row">
+              <button onClick={() => setStep("message")} className="btn btn-ghost">رجوع</button>
+              {moment.trim() ? (
+                <button onClick={nextFromMoment} className="btn btn-primary">التالى</button>
               ) : (
-                <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-[var(--slate-200)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--slate-300)] transition-colors">
-                  <svg className="w-8 h-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="var(--slate-300)" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                  </svg>
-                  <p className="text-sm" style={{ color: "var(--slate-500)" }}>اضغط لاختيار صورة</p>
-                  <p className="text-xs mt-1" style={{ color: "var(--slate-400)" }}>JPG، PNG، WebP — حد أقصى 5 ميجا</p>
-                </div>
+                <button onClick={nextFromMoment} className="btn btn-outline">تخطي</button>
               )}
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={onImage} className="hidden" />
-              {errors.image && <p className="mt-1 text-xs" style={{ color: "var(--red)" }}>{errors.image}</p>}
-            </div>
-
-            {/* Toggle */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--slate-50)]">
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--slate-700)" }}>رسالتي للجمهور</p>
-                <p className="text-xs" style={{ color: "var(--slate-400)" }}>{isPublic ? "هتظهر للجميع" : "هتفضل خاصة"}</p>
-              </div>
-              <button type="button" onClick={() => setIsPublic(!isPublic)} className={`toggle-wrap ${isPublic ? "on" : ""}`} role="switch" aria-checked={isPublic} />
             </div>
           </div>
+        )}
 
-          {submitError && (
-            <div className="p-3 rounded-lg text-sm font-medium" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "var(--red)" }}>
-              {submitError}
+        {/* Step: image */}
+        {step === "image" && (
+          <div className="wiz-card anim-wiz-in" key="image">
+            <p className="wiz-step-label">الخطوة ٤ من ٤ — اختياري</p>
+            <label className="wiz-label">عندك صورة تحب تحفظها مع الذكرى؟</label>
+
+            {imagePreview ? (
+              <div className="wiz-img-prev">
+                <img src={imagePreview} alt="معاينة الصورة" className="wiz-img" />
+                <button onClick={removeImage} className="wiz-img-remove" aria-label="حذف الصورة">
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div
+                className={`wiz-drop ${dragging ? "drag" : ""}`}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) handleFile(f);
+                }}
+                role="button"
+                aria-label="اختيار صورة"
+              >
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#b19a78" strokeWidth="1.2">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                <p className="wiz-drop-title">اضغط لاختيار صورة</p>
+                <p className="wiz-drop-sub">أو اسحبها هنا على الكمبيوتر</p>
+                <p className="wiz-drop-note">JPG · PNG · WebP — حتى ٥ ميجا</p>
+              </div>
+            )}
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={onImage}
+              className="hidden"
+            />
+            {imgError && <p className="wiz-error">{imgError}</p>}
+
+            <div className="wiz-btn-row wiz-btns-split">
+              <div className="wiz-btns-left">
+                <button onClick={() => setStep("moment")} className="btn btn-ghost">رجوع</button>
+                <button onClick={nextFromImage} className="btn btn-outline">تخطي</button>
+              </div>
+              <button onClick={nextFromImage} className="btn btn-primary">التالي</button>
             </div>
-          )}
+          </div>
+        )}
 
-          <button
-            type="submit"
-            disabled={submitting || !nameOk || !msgOk}
-            className="btn btn-lg w-full transition-all duration-300"
-            style={{
-              background: (nameOk && msgOk) ? "var(--navy)" : "var(--slate-200)",
-              color: (nameOk && msgOk) ? "white" : "var(--slate-400)",
-              cursor: (submitting || !nameOk || !msgOk) ? "not-allowed" : "pointer",
-              boxShadow: (nameOk && msgOk) ? "0 4px 12px rgba(30,41,59,0.2)" : "none",
-            }}
-          >
-            {submitting ? <><div className="spinner" /> جاري الإرسال...</> : "سيب كلمتك في الدفتر ❤️"}
-          </button>
+        {/* Step: preview */}
+        {step === "preview" && (
+          <div className="anim-wiz-in" key="preview">
+            <div className="wiz-card wiz-preview-head">
+              <h2 className="wiz-title wiz-title-sm">دي الذكرى اللي هتفضل</h2>
+              <p className="wiz-sub wiz-sub-sm">شكلها في معرض الذكريات هيكون قريب من كده بالظبط.</p>
+            </div>
 
-          <p className="text-center text-xs" style={{ color: "var(--slate-400)" }}>رسالتك هتظهر بعد مراجعتها من المسؤول</p>
-        </form>
+            <div className="wiz-preview-paper">
+              <MemoryCard m={previewMemory} variant="quote" />
+            </div>
+
+            {!nameOk || !msgOk ? (
+              <div className="wiz-card">
+                <p className="wiz-error">لاحظ إن فيه بيانات ناقصة</p>
+                <div className="wiz-btn-row">
+                  <button onClick={() => setStep("message")} className="btn btn-primary">راجع الذكرى</button>
+                </div>
+              </div>
+            ) : (
+              <div className="wiz-card">
+                <div className="wiz-vis-row">
+                  <div>
+                    <p className="wiz-vis-title">رسالتي للجمهور</p>
+                    <p className="wiz-vis-sub">{isPublic ? "هتظهر في معرض الذكريات" : "هتفضل في الدفتر بس"}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPublic(!isPublic)}
+                    className={`toggle-wrap ${isPublic ? "on" : ""}`}
+                    role="switch"
+                    aria-checked={isPublic}
+                    aria-label="رسالتي للجمهور"
+                  />
+                </div>
+
+                {submitError && (
+                  <div className="wiz-submit-error" role="alert">
+                    {submitError}
+                  </div>
+                )}
+
+                <div className="wiz-btn-row">
+                  <button onClick={() => setStep("image")} className="btn btn-ghost">تعديل الذكرى</button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="btn btn-primary btn-lg wiz-save"
+                  >
+                    {submitting ? "بنحفظ الذكرى..." : "حفظ الذكرية 🤍"}
+                  </button>
+                </div>
+                <p className="wiz-note">ذكرتك هتظهر بعد موافقة المسؤول عليها.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {submitting && (
+        <div className="wiz-overlay">
+          <div className="spinner spinner-dark" />
+          <p>بنحفظ الذكرى...</p>
+        </div>
+      )}
     </main>
   );
 }
