@@ -476,6 +476,19 @@ body {
 .wiz-saving-btn:disabled { opacity: 0.7; }
 
 .wiz-save { width: 100%; }
+
+.wiz-thanks {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(201,137,45,0.25);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.9;
+  text-align: center;
+}
+
 .wiz-note {
   font-size: 12px;
   color: var(--ink-faint);

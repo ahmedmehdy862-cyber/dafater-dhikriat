@@ -238,6 +238,7 @@ export default function WritePage() {
       });
       if (!res.ok) throw new Error("submit-failed");
       localStorage.removeItem(DRAFT_KEY);
+      sessionStorage.setItem("dafater_writer_name", name.trim());
       router.push("/success");
     } catch {
       setSubmitError("حصلت مشكلة بسيطة أثناء حفظ الذكرى. جرّب مرة تانية، واللي كتبته لسه موجود.");
@@ -479,6 +480,9 @@ export default function WritePage() {
               </div>
             ) : (
               <div className="wiz-card">
+                <p className="wiz-thanks">
+                  &#129525; شكرًا ليك {name.trim() ? `يا ${name.trim()}` : "من القلب"} — اللي كتبته هيفضل محفوظ هنا.
+                </p>
                 <div className="wiz-vis-row">
                   <div>
                     <p className="wiz-vis-title">رسالتي للجمهور</p>
