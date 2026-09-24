@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { notifyWhatsApp } from "@/lib/whatsapp";
 
 export async function GET(request: NextRequest) {
   try {
@@ -113,6 +114,11 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const snippet = message.trim().slice(0, 80);
+    notifyWhatsApp(
+      `🔔 *ذكرى جديدة بانتظار المراجعة*\n\n👤 ${name.trim()}\n\n💬 ${snippet}…\n\nافتح لوحة التحكم للمراجعة والموافقة.`
+    );
 
     return NextResponse.json({ memory: data }, { status: 201 });
   } catch {
