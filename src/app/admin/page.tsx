@@ -84,7 +84,7 @@ export default function AdminPage() {
       return;
     }
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       try {
         const res = await fetch("/api/admin/memories", {
           headers: { Authorization: `Bearer ${token}` },
@@ -99,13 +99,16 @@ export default function AdminPage() {
         const list: Memory[] = Array.isArray(data) ? data : data.memories || [];
         if (!cancelled) setMemories(list);
       } catch {
-        router.push("/admin/login");
+        // keep existing data; only leave on hard auth failure
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+    load();
+    const intervalId = window.setInterval(load, 30000);
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [getToken, router]);
 
@@ -221,6 +224,11 @@ export default function AdminPage() {
     hidden: memories.filter((m) => m.status === "hidden").length,
   };
 
+  useEffect(() => {
+    document.title =
+      stats.pending > 0 ? `لوحة التحكم (${stats.pending} جديد)` : "لوحة التحكم";
+  }, [stats.pending]);
+
   if (loading) {
     return (
       <div
@@ -280,16 +288,46 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {stats.pending > 0 && (
+          <div
+            className="card p-4 mb-5 sm:mb-6 flex flex-wrap items-center justify-between gap-3"
+            style={{
+              background: "#fefce8",
+              borderRight: "4px solid #f59e0b",
+              boxShadow: "0 2px 8px rgba(245,158,11,0.15)",
+            }}
+          >
+            <p className="text-sm font-bold" style={{ color: "#92400e" }}>
+              &#128276; فيه {stats.pending} رسالة جديدة مستنية مراجعتك
+            </p>
+            <button
+              onClick={() => setActiveFilter("pending")}
+              className="btn btn-sm"
+              style={{ background: "#f59e0b", color: "white" }}
+            >
+              مراجعة الآن
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-5 sm:mb-6 overflow-x-auto pb-2">
           {FILTER_TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
-              className={`btn btn-sm whitespace-nowrap ${
+              className={`btn btn-sm whitespace-nowrap relative ${
                 activeFilter === tab.key ? "btn-primary" : "btn-outline"
               }`}
             >
               {tab.label}
+              {tab.key === "pending" && stats.pending > 0 && (
+                <span
+                  className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[11px] font-bold mr-1.5"
+                  style={{ background: "#f59e0b", color: "white" }}
+                >
+                  {stats.pending}
+                </span>
+              )}
             </button>
           ))}
         </div>
