@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(clientKey(request, "upload"), 10, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "حاول تاني بعد شوية" },
+        { status: 429 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 

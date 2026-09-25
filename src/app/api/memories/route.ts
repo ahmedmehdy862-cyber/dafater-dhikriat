@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notifyWhatsApp } from "@/lib/whatsapp";
+import { verifyAdminToken, getTokenFromRequest } from "@/lib/admin-auth";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +38,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
-    const showAll = searchParams.get("all") === "true";
+    const showAll =
+      searchParams.get("all") === "true" &&
+      verifyAdminToken(getTokenFromRequest(request));
 
     let query = supabaseAdmin
       .from("memories")
@@ -70,6 +74,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(clientKey(request, "submit"), 5, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "حاول تاني بعد شوية" },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { name, nice_moment, message, image_url, is_public } = body;
 

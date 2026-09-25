@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAdminToken } from "@/lib/admin-auth";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(clientKey(request, "login"), 5, 15 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "محاولات كتير. استنى شوية وحاول تاني." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
@@ -16,8 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (email === adminEmail && password === adminPassword) {
-      // Generate a simple token (in production, use JWT or session)
-      const token = Buffer.from(`${email}:${Date.now()}`).toString("base64");
+      const token = createAdminToken(email);
 
       const response = NextResponse.json({ success: true, token });
 

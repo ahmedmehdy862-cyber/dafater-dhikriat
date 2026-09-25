@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { verifyAdminToken, getTokenFromRequest } from "@/lib/admin-auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const isAdmin = verifyAdminToken(getTokenFromRequest(request));
     const { id } = await params;
-    const { data, error } = await supabaseAdmin
-      .from("memories")
-      .select("*")
-      .eq("id", id)
-      .single();
+    let query = supabaseAdmin.from("memories").select("*").eq("id", id);
+    if (!isAdmin) query = query.eq("status", "approved");
+    const { data, error } = await query.single();
 
     if (error || !data) {
       return NextResponse.json(
@@ -34,6 +34,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!verifyAdminToken(getTokenFromRequest(request))) {
+      return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { status, is_favorite, show_name, show_nice_moment, show_image } = body;
@@ -66,10 +70,14 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!verifyAdminToken(getTokenFromRequest(request))) {
+      return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+    }
+
     const { id } = await params;
 
     // Get the memory first to delete image if exists

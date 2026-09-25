@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-
-function verifyAuth(request: NextRequest): boolean {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
-  const token = authHeader.split(" ")[1];
-  try {
-    const decoded = Buffer.from(token, "base64").toString();
-    const [email] = decoded.split(":");
-    return email === process.env.ADMIN_EMAIL;
-  } catch {
-    return false;
-  }
-}
+import { verifyAdminToken, getTokenFromRequest } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
-  if (!verifyAuth(request)) {
+  if (!verifyAdminToken(getTokenFromRequest(request))) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   }
 
